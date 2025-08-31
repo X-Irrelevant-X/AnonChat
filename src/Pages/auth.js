@@ -14,8 +14,7 @@ export function SignUp() {
     setError(null);
     try {
       await auth.createUserWithEmailAndPassword(email, password);
-      alert("Account created successfully!");
-      navigate('/chat');
+      navigate('/userhome');
     } catch (err) {
       setError(err.message);
     }
@@ -64,8 +63,7 @@ export function SignIn() {
     setError(null);
     try {
       await auth.signInWithEmailAndPassword(email, password);
-      alert("Signed in successfully!");
-      navigate('/chat');
+      navigate('/userhome');
     } catch (err) {
       setError(err.message);
     }

@@ -1,0 +1,123 @@
+/* src/styles/Register.css */
+.register-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #1a1a2e;
+  padding: 20px;
+}
+
+.register-form {
+  background-color: #16213e;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 500px;
+}
+
+.register-title {
+  text-align: center;
+  margin-bottom: 1rem;
+  font-size: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.register-form h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: white;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 1rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.form-input {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  background-color: #2d2d44;
+  color: white;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: 2px solid #6649b8;
+  background-color: #3a3a5c;
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 5px;
+  background-color: #2d2d44;
+  color: white;
+  font-size: 1rem;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-textarea:focus {
+  outline: 2px solid #6649b8;
+  background-color: #3a3a5c;
+}
+
+.register-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #4c4c9f;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+  margin-top: 1rem;
+}
+
+.register-button:hover:not(:disabled) {
+  background-color: #6649b8;
+}
+
+.register-button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.error-message {
+  color: #ff6b6b;
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .register-form {
+    padding: 1.5rem;
+    margin: 10px;
+  }
+}

@@ -312,3 +312,41 @@
 .user-profile .user-name:active {
   transform: translateY(0);
 }
+
+
+/* Add these styles to center the title */
+.user-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #181717;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  border-bottom: 1px solid #2d2d44;
+}
+
+.user-profile {
+  flex: 1;
+}
+
+.app-title {
+  flex: 2;
+  text-align: center;
+}
+
+.app-title h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.header-buttons {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}

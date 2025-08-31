@@ -1,16 +1,33 @@
-
 import React, { useState, useEffect } from 'react';
 import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Link, useNavigate } from 'react-router-dom';
 import '../Styles/user.css';
 
-
 function UserHome() {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Load user's profile data
+  useEffect(() => {
+    if (!user) return;
+
+    const loadUserProfile = async () => {
+      try {
+        const userDoc = await firestore.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          setUserProfile(userDoc.data());
+        }
+      } catch (err) {
+        console.error('Failed to load user profile:', err);
+      }
+    };
+
+    loadUserProfile();
+  }, [user]);
 
   // Load user's chats from Firestore
   useEffect(() => {
@@ -33,11 +50,11 @@ function UserHome() {
   };
 
   const handleAddFriend = () => {
-    
+    // TODO: Implement add friend functionality
   };
 
   const handleSearch = () => {
-    
+    // TODO: Implement search functionality
   };
 
   const handleSignOut = () => {
@@ -51,8 +68,11 @@ function UserHome() {
       <header className="user-header">
         <div className="user-profile">
           <Link to="/profile" className="user-name">
-            {user?.email?.split('@')[0] || 'Anonymous'}
+            {userProfile?.username || user?.email?.split('@')[0] || 'Anonymous'}
           </Link>
+        </div>
+        <div className="app-title">
+          <h1>🔥 AnonChat 🔥</h1>
         </div>
         <div className="header-buttons">
           <button onClick={handleAddFriend} className="header-button">Add Friends</button>

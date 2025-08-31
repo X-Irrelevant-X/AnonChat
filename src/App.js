@@ -1,11 +1,14 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './Pages/home';
-import UserHome from './Pages/userhome';
-//import ChatRoom from './Pages/ChatRoom';
 import { auth } from './firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { SignUp, SignIn } from './Pages/auth';
+
+import Home from './Pages/home';
+import UserHome from './Pages/userhome';
+import { SignIn } from './Pages/auth';
+import Register from './Pages/register';
+import Profile from './Pages/profile';
+
 
 function App() {
   const [user] = useAuthState(auth);
@@ -18,16 +21,17 @@ function App() {
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/signin" element={<SigninPage />} />
           <Route path="/userhome" element={user ? <UserHome /> : <Home />} />
+          <Route path="/profile" element={user ? <Profile /> : <Home />} />
         </Routes>
       </div>
     </Router>
   );
 }
 
-// Wrapper components to add styling
+// Wrapper components
 const SignupPage = () => (
   <div className="form-container">
-    <SignUp />
+    <Register />
   </div>
 );
 

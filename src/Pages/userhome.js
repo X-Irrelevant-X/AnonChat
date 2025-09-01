@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Link, useNavigate } from 'react-router-dom';
-import sessionManager from '../security/sessionmanager';
+import sessionManager from '../security/sessionManager';
 import EncryptionService from '../security/encrydecry';
 import '../Styles/user.css';
+
 
 function UserHome() {
   const [user] = useAuthState(auth);
@@ -14,6 +15,11 @@ function UserHome() {
   const [chats, setChats] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [showAddFriend, setShowAddFriend] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   // Load and decrypt user's profile data using session manager
   useEffect(() => {
@@ -84,16 +90,151 @@ function UserHome() {
     return () => unsubscribe();
   }, [user]);
 
+  // Load pending requests count
+  useEffect(() => {
+    if (!user) return;
+
+    const requestsRef = firestore
+      .collection('friends')
+      .where('user2', '==', user.uid)
+      .where('status', '==', 'pending');
+      
+    const unsubscribe = requestsRef.onSnapshot(snapshot => {
+      setPendingRequests(snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
   const handleChatClick = (chat) => {
     setSelectedChat(chat);
+    setShowAddFriend(false); // Hide add friend panel when selecting chat
   };
 
-  const handleAddFriend = () => {
-    alert("Add Friend feature coming soon!");
+  // Search for users by username or email
+  const handleSearchUsers = async () => {
+    if (!searchTerm.trim()) return;
+    
+    setSearching(true);
+    try {
+      // Search by username
+      const usernameQuery = await firestore
+        .collection('users')
+        .where('encryptedProfile.username', '==', searchTerm)
+        .get();
+      
+      // Search by email (partial match)
+      const emailQuery = await firestore
+        .collection('users')
+        .where('email', '>=', searchTerm)
+        .where('email', '<=', searchTerm + '\uf8ff')
+        .get();
+      
+      const results = [];
+      
+      // Process username matches
+      usernameQuery.forEach(doc => {
+        if (doc.id !== user.uid) { // Don't show current user
+          results.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        }
+      });
+      
+      // Process email matches
+      emailQuery.forEach(doc => {
+        if (doc.id !== user.uid) { // Don't show current user
+          const exists = results.find(r => r.id === doc.id);
+          if (!exists) {
+            results.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        }
+      });
+      
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Search error:', error);
+      alert('Search failed: ' + error.message);
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const handleSearch = () => {
-    alert("Search Users feature coming soon!");
+  // Add friend function (send friend request)
+  const handleAddFriend = async (friendId) => {
+    try {
+      // Check if friend request already exists
+      const existingRequest1 = await firestore
+        .collection('friends')
+        .where('user1', '==', user.uid)
+        .where('user2', '==', friendId)
+        .get();
+        
+      const existingRequest2 = await firestore
+        .collection('friends')
+        .where('user1', '==', friendId)
+        .where('user2', '==', user.uid)
+        .get();
+        
+      if (!existingRequest1.empty || !existingRequest2.empty) {
+        alert('Friend request already sent or you are already friends');
+        return;
+      }
+      
+      // Get current user's public key from session
+      const currentUserPublicKey = sessionManager.getPublicKey();
+      const exportedCurrentUserPublicKey = await exportPublicKeyToString(currentUserPublicKey);
+      
+      // Create friend request
+      await firestore.collection('friends').add({
+        user1: user.uid, // Requester
+        user2: friendId, // Request recipient
+        user1PublicKey: exportedCurrentUserPublicKey, // Requester's public key
+        createdAt: new Date(),
+        status: 'pending'
+      });
+      
+      alert('Friend request sent successfully!');
+      setSearchResults([]); // Clear search results
+      setSearchTerm(''); // Clear search term
+      setShowAddFriend(false); // Hide add friend panel
+    } catch (error) {
+      console.error('Add friend error:', error);
+      alert('Failed to send friend request: ' + error.message);
+    }
+  };
+
+  // Helper function to export public key to string
+  const exportPublicKeyToString = async (key) => {
+    const exported = await window.crypto.subtle.exportKey("spki", key);
+    return arrayBufferToBase64(exported);
+  };
+
+  // Helper function to convert ArrayBuffer to base64
+  const arrayBufferToBase64 = (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
+
+  const handleFriends = () => {
+    navigate('/friends');
+  };
+
+  const handleRequests = () => {
+    navigate('/requests');
+  };
+
+  const handleToggleAddFriend = () => {
+    setShowAddFriend(!showAddFriend);
+    setSelectedChat(null); // Hide chat view when showing add friend
   };
 
   const handleSignOut = () => {
@@ -125,8 +266,13 @@ function UserHome() {
           <h1>🔥 AnonChat 🔥</h1>
         </div>
         <div className="header-buttons">
-          <button onClick={handleAddFriend} className="header-button">Add Friends</button>
-          <button onClick={handleSearch} className="header-button">Search Users</button>
+          <button onClick={handleFriends} className="header-button">Friends</button>
+          <button onClick={handleRequests} className="header-button">
+            Requests {pendingRequests > 0 && `(${pendingRequests})`}
+          </button>
+          <button onClick={handleToggleAddFriend} className="header-button">
+            {showAddFriend ? 'Close' : 'Add Friends'}
+          </button>
           <button onClick={handleSignOut} className="header-button">Sign Out</button>
         </div>
       </header>
@@ -152,7 +298,45 @@ function UserHome() {
 
         {/* Main Panel */}
         <main className="main-panel">
-          {selectedChat ? (
+          {showAddFriend ? (
+            <div className="add-friend-panel">
+              <h2>Add Friends</h2>
+              <div className="search-container">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Enter username or email"
+                  className="search-input"
+                />
+                <button onClick={handleSearchUsers} disabled={searching} className="search-button">
+                  {searching ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+              
+              <div className="search-results">
+                {searchResults.length > 0 ? (
+                  <ul className="results-list">
+                    {searchResults.map(user => (
+                      <li key={user.id} className="result-item">
+                        <div className="user-info">
+                          <span className="user-name">{user.email}</span>
+                        </div>
+                        <button 
+                          onClick={() => handleAddFriend(user.id)}
+                          className="add-button"
+                        >
+                          Add Friend
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : searchTerm && !searching ? (
+                  <p className="no-results">No users found</p>
+                ) : null}
+              </div>
+            </div>
+          ) : selectedChat ? (
             <ChatView chat={selectedChat} />
           ) : (
             <div className="empty-state">

@@ -1,4 +1,3 @@
-// src/Pages/Register.js
 import React, { useState } from 'react';
 import { auth, firestore } from '../firebase';
 import { useNavigate } from 'react-router-dom';

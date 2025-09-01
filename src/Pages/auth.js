@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import sessionManager from '../security/sessionmanager'; 
+import sessionManager from '../security/sessionManager'; 
 import '../Styles/auth.css';
 
 export function SignIn() {

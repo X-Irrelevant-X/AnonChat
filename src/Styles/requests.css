@@ -1,0 +1,125 @@
+.requests-container {
+  min-height: 100vh;
+  background-color: #1a1a2e;
+  color: white;
+}
+
+.requests-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #181717;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.requests-header h1 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.back-button:hover {
+  background-color: #2d2d44;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+}
+
+.no-requests {
+  text-align: center;
+  padding: 2rem;
+}
+
+.requests-list {
+  padding: 1rem;
+}
+
+.request-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background-color: #16213e;
+  border-radius: 8px;
+  border: 1px solid #2d2d44;
+}
+
+.requester-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.requester-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4c4c9f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.requester-details h3 {
+  margin: 0 0 0.25rem 0;
+  color: white;
+}
+
+.requester-details p {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.request-date {
+  font-size: 0.8rem;
+  color: #999;
+  margin-top: 0.25rem;
+}
+
+.request-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.accept {
+  background-color: #2ed573;
+  color: white;
+}
+
+.accept:hover {
+  background-color: #1dd1a1;
+}
+
+.reject {
+  background-color: #ff4757;
+  color: white;
+}
+
+.reject:hover {
+  background-color: #ff6b81;
+}

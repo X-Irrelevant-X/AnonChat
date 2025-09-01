@@ -1,5 +1,5 @@
-import EncryptionService from '../security/encrydecry';
-import keyManager from '../security/keymanage'; 
+import EncryptionService from './encrydecry';
+import keyManager from './keymanage'; 
 
 class SessionManager {
   constructor() {

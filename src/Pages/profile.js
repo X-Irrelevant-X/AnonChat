@@ -1,9 +1,8 @@
-// src/Pages/Profile.js
 import React, { useState, useEffect } from 'react';
 import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
-import sessionManager from '../security/sessionmanager';
+import sessionManager from '../security/sessionManager';
 import EncryptionService from '../security/encrydecry';
 import '../Styles/profile_s.css';
 
@@ -34,7 +33,6 @@ const Profile = () => {
         
         // Check if session is active
         if (!sessionManager.isSessionActive()) {
-          // No active session, redirect to login
           auth.signOut();
           navigate('/signin');
           return;
@@ -66,13 +64,12 @@ const Profile = () => {
           
           setUserData(fullUserData);
           
-          // Set form data for editing (excluding username which is not editable)
           const { username, ...editableData } = decryptedProfile;
           setFormData(editableData);
         }
       } catch (err) {
         console.error('Failed to load/decrypt profile ', err);
-        sessionManager.endSession(); // End invalid session
+        sessionManager.endSession();
         auth.signOut();
         navigate('/signin');
       } finally {

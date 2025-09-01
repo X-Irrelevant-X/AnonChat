@@ -1,0 +1,268 @@
+.friends-container {
+  min-height: 100vh;
+  background-color: #1a1a2e;
+  color: white;
+}
+
+.friends-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #181717;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.friends-header h1 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.back-button:hover {
+  background-color: #2d2d44;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+}
+
+.no-friends {
+  text-align: center;
+  padding: 2rem;
+}
+
+.no-friends p {
+  margin-bottom: 1rem;
+}
+
+.add-friends-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #4c4c9f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-friends-button:hover {
+  background-color: #6649b8;
+}
+
+.friends-list {
+  padding: 1rem;
+}
+
+.friend-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  background-color: #16213e;
+  border-radius: 8px;
+  border: 1px solid #2d2d44;
+}
+
+.friend-info {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex: 1;
+}
+
+.friend-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #4c4c9f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.friend-details h3 {
+  margin: 0 0 0.25rem 0;
+  color: white;
+}
+
+.friend-details p {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.friend-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.action-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.view-profile {
+  background-color: #2d2d44;
+  color: white;
+}
+
+.view-profile:hover {
+  background-color: #3a3a5c;
+}
+
+.unfriend {
+  background-color: #ff4757;
+  color: white;
+}
+
+.unfriend:hover {
+  background-color: #ff6b81;
+}
+
+.profile-view-container {
+  padding: 1rem;
+}
+
+.profile-view-header {
+  display: flex;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid #2d2d44;
+  margin-bottom: 1rem;
+}
+
+.profile-view-header h2 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+}
+
+.profile-loading, .profile-error {
+  text-align: center;
+  padding: 2rem;
+  color: #ccc;
+}
+
+.friend-profile-card {
+  background-color: #16213e;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.profile-header-section {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #4c4c9f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 1.5rem;
+}
+
+.avatar-initials {
+  font-size: 2rem;
+  font-weight: bold;
+  color: white;
+}
+
+.profile-basic-info h2 {
+  margin: 0 0 0.5rem 0;
+  color: white;
+  font-size: 1.5rem;
+}
+
+.profile-email {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.profile-view-content {
+  margin-top: 1rem;
+}
+
+.profile-field {
+  display: flex;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #2d2d44;
+}
+
+.profile-field label {
+  font-weight: bold;
+  color: #ccc;
+  width: 120px;
+  margin-right: 1rem;
+}
+
+.profile-field span {
+  color: white;
+  flex: 1;
+}
+
+.profile-view-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #2d2d44;
+}
+
+.primary-button {
+  padding: 12px 24px;
+  background-color: #4c4c9f;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+  flex: 1;
+}
+
+.primary-button:hover {
+  background-color: #6649b8;
+}
+
+.danger-button {
+  padding: 12px 24px;
+  background-color: #ff4757;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+  flex: 1;
+}
+
+.danger-button:hover {
+  background-color: #ff6b81;
+}

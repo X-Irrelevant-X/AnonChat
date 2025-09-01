@@ -8,6 +8,8 @@ import UserHome from './Pages/userhome';
 import { SignIn } from './Pages/auth';
 import Register from './Pages/register';
 import Profile from './Pages/profile';
+import Friends from './Pages/Friends';
+import Requests from './Pages/Requests';
 
 
 function App() {
@@ -22,6 +24,8 @@ function App() {
           <Route path="/signin" element={<SigninPage />} />
           <Route path="/userhome" element={user ? <UserHome /> : <Home />} />
           <Route path="/profile" element={user ? <Profile /> : <Home />} />
+          <Route path="/friends" element={user ? <Friends /> : <Home />} />
+          <Route path="/requests" element={user ? <Requests /> : <Home />} />
         </Routes>
       </div>
     </Router>

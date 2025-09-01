@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Link, useNavigate } from 'react-router-dom';
+import sessionManager from '../security/sessionmanager';
 import EncryptionService from '../security/encrydecry';
-import keyManager from '../security/keymanage';
 import '../Styles/user.css';
 
 function UserHome() {
@@ -11,6 +11,7 @@ function UserHome() {
   const navigate = useNavigate();
   const [userProfile, setUserProfile] = useState(null);
   const [decryptedProfile, setDecryptedProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   // Load and decrypt user's profile data
   useEffect(() => {
@@ -18,24 +19,29 @@ function UserHome() {
 
     const loadAndDecryptUserProfile = async () => {
       try {
+        setLoading(true);
+        
+        // Check if session is active
+        if (!sessionManager.isSessionActive()) {
+          // No active session, redirect to login
+          auth.signOut();
+          navigate('/signin');
+          return;
+        }
+        
+        // Get private key from session
+        const privateKey = sessionManager.getPrivateKey();
+        
+        // Load user document from Firestore
         const userDoc = await firestore.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           const encryptedData = userDoc.data();
-          
-          // Prompt user for password to decrypt their data
-          const password = prompt("Enter your password to view profile:");
-          if (!password) {
-            throw new Error("Password required to decrypt profile");
-          }
-          
-          // Load user's keys using their password
-          const userKeys = await keyManager.loadUserKeys(user.uid, password);
           
           // Decrypt profile data if it exists
           if (encryptedData.encryptedProfile) {
             const decryptedData = await EncryptionService.decryptUserProfileData(
               encryptedData.encryptedProfile,
-              userKeys.privateKey
+              privateKey
             );
             
             setDecryptedProfile(decryptedData);
@@ -49,12 +55,16 @@ function UserHome() {
         }
       } catch (err) {
         console.error('Failed to load/decrypt user profile:', err);
-        alert('Failed to load profile: ' + err.message);
+        sessionManager.endSession(); // End invalid session
+        auth.signOut();
+        navigate('/signin');
+      } finally {
+        setLoading(false);
       }
     };
 
     loadAndDecryptUserProfile();
-  }, [user]);
+  }, [user, navigate]);
 
   const handleAddFriend = () => {
     alert("Add Friend feature coming soon!");
@@ -65,9 +75,20 @@ function UserHome() {
   };
 
   const handleSignOut = () => {
+    sessionManager.endSession(); // End session using your session manager
     auth.signOut();
     navigate('/');
   };
+
+  if (loading) {
+    return (
+      <div className="user-home-container">
+        <div className="loading-message">
+          <p>Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="user-home-container">

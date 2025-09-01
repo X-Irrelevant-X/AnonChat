@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
+import sessionManager from '../security/sessionmanager'; 
 import '../Styles/auth.css';
 
 export function SignIn() {
@@ -13,7 +14,11 @@ export function SignIn() {
     e.preventDefault();
     setError(null);
     try {
-      await auth.signInWithEmailAndPassword(email, password);
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      
+      // Start secure session using your session manager
+      await sessionManager.startSession(userCredential.user.uid, password);
+      
       navigate('/userhome');
     } catch (err) {
       // Better error handling
@@ -63,7 +68,10 @@ export function SignIn() {
 
 export function SignOut() {
   return auth.currentUser && (
-    <button className="sign-out-btn" onClick={() => auth.signOut()}>
+    <button className="sign-out-btn" onClick={() => {
+      sessionManager.endSession(); // End session using your session manager
+      auth.signOut();
+    }}>
       Sign Out
     </button>
   );

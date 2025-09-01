@@ -1,9 +1,10 @@
+// src/Pages/Profile.js
 import React, { useState, useEffect } from 'react';
 import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
+import sessionManager from '../security/sessionmanager';
 import EncryptionService from '../security/encrydecry';
-import keyManager from '../security/keymanage';
 import '../Styles/profile_s.css';
 
 const Profile = () => {
@@ -30,27 +31,30 @@ const Profile = () => {
     const loadAndDecryptUserData = async () => {
       try {
         setLoading(true);
+        
+        // Check if session is active
+        if (!sessionManager.isSessionActive()) {
+          // No active session, redirect to login
+          auth.signOut();
+          navigate('/signin');
+          return;
+        }
+        
+        // Get private key from session
+        const privateKey = sessionManager.getPrivateKey();
+        
         // Get user document from Firestore
         const userDoc = await firestore.collection('users').doc(user.uid).get();
         
         if (userDoc.exists) {
           const encryptedData = userDoc.data();
           
-          // Prompt user for password to decrypt their data
-          const password = prompt("Enter your password to view profile:");
-          if (!password) {
-            throw new Error("Password required to decrypt profile");
-          }
-          
-          // Load user's keys using their password
-          const userKeys = await keyManager.loadUserKeys(user.uid, password);
-          
           // Decrypt profile data
           let decryptedProfile = {};
           if (encryptedData.encryptedProfile) {
             decryptedProfile = await EncryptionService.decryptUserProfileData(
               encryptedData.encryptedProfile,
-              userKeys.privateKey
+              privateKey
             );
           }
           
@@ -68,14 +72,16 @@ const Profile = () => {
         }
       } catch (err) {
         console.error('Failed to load/decrypt profile ', err);
-        setError('Failed to load profile data: ' + err.message);
+        sessionManager.endSession(); // End invalid session
+        auth.signOut();
+        navigate('/signin');
       } finally {
         setLoading(false);
       }
     };
 
     loadAndDecryptUserData();
-  }, [user]);
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     setFormData({
@@ -101,14 +107,8 @@ const Profile = () => {
     setError(null);
 
     try {
-      // Prompt for password to get encryption keys
-      const password = prompt("Enter your password to save changes:");
-      if (!password) {
-        throw new Error("Password required to encrypt profile");
-      }
-      
-      // Load user keys for encryption
-      const userKeys = await keyManager.loadUserKeys(user.uid, password);
+      // Get public key from session
+      const publicKey = sessionManager.getPublicKey();
       
       // Prepare updated profile data
       const updatedProfile = {
@@ -120,7 +120,7 @@ const Profile = () => {
       // Encrypt updated profile data
       const encryptedProfile = await EncryptionService.encryptUserProfileData(
         updatedProfile,
-        userKeys.publicKey
+        publicKey
       );
       
       // Update encrypted profile in Firestore
@@ -147,12 +147,8 @@ const Profile = () => {
     setError(null);
 
     try {
-      // Re-authenticate user
-      const credential = firebase.auth.EmailAuthProvider.credential(
-        user.email,
-        passwordData.oldPassword
-      );
-      await user.reauthenticateWithCredential(credential);
+      // Re-authenticate using your session manager
+      await sessionManager.reauthenticate(user.uid, passwordData.oldPassword);
 
       // Check if new passwords match
       if (passwordData.newPassword !== passwordData.confirmNewPassword) {
@@ -175,6 +171,9 @@ const Profile = () => {
 
       // Update password
       await user.updatePassword(passwordData.newPassword);
+      
+      // Restart session with new password
+      await sessionManager.startSession(user.uid, passwordData.newPassword);
       
       setPasswordData({
         oldPassword: '',
@@ -209,6 +208,9 @@ const Profile = () => {
       // Delete user account from Firebase Auth
       await user.delete();
       
+      // End session
+      sessionManager.endSession();
+      
       alert('Account deleted successfully');
       navigate('/');
     } catch (err) {
@@ -223,6 +225,7 @@ const Profile = () => {
   };
 
   const handleSignOut = () => {
+    sessionManager.endSession(); // End session using your session manager
     auth.signOut();
     navigate('/');
   };

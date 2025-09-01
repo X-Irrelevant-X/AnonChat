@@ -3,7 +3,6 @@ import { auth } from '../firebase';
 import { useNavigate } from 'react-router-dom';
 import '../Styles/auth.css';
 
-
 export function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,7 +16,16 @@ export function SignIn() {
       await auth.signInWithEmailAndPassword(email, password);
       navigate('/userhome');
     } catch (err) {
-      setError(err.message);
+      // Better error handling
+      if (err.code === 'auth/user-not-found') {
+        setError("No account found with this email.");
+      } else if (err.code === 'auth/wrong-password') {
+        setError("Incorrect password.");
+      } else if (err.code === 'auth/invalid-email') {
+        setError("Invalid email address.");
+      } else {
+        setError("Login failed: " + err.message);
+      }
     }
   };
 
@@ -27,7 +35,7 @@ export function SignIn() {
         <h1>🔥 AnonChat 🔥</h1>
       </header>
 
-      <h1>Sign In</h1>
+      <h1>Log In</h1>
 
       <form className="auth-form" onSubmit={handleSignIn}>
         <input

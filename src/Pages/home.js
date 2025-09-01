@@ -10,8 +10,8 @@ const Home = () => {
       </header>
 
       <main className="home-main">
-        <Link to="/signup" className="btn">Sign Up</Link>
-        <Link to="/signin" className="btn">Sign In</Link>
+        <Link to="/signin" className="btn">Log In</Link>
+        <Link to="/signup" className="btn">Register</Link>
       </main>
     </div>
   );

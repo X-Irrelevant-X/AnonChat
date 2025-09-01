@@ -1,7 +1,9 @@
-import React, { firebase, useState, useEffect } from 'react';
-import { auth, firestore } from '../firebase';
+import React, { useState, useEffect } from 'react';
+import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
+import EncryptionService from '../security/encrydecry';
+import keyManager from '../security/keymanage';
 import '../Styles/profile_s.css';
 
 const Profile = () => {
@@ -21,28 +23,58 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load user data
+  // Load and decrypt user data
   useEffect(() => {
     if (!user) return;
 
-    const loadUserData = async () => {
+    const loadAndDecryptUserData = async () => {
       try {
+        setLoading(true);
+        // Get user document from Firestore
         const userDoc = await firestore.collection('users').doc(user.uid).get();
+        
         if (userDoc.exists) {
-          const data = userDoc.data();
-          setUserData(data);
-          // Don't include username in form data to prevent editing
-          const { username, ...editableData } = data;
+          const encryptedData = userDoc.data();
+          
+          // Prompt user for password to decrypt their data
+          const password = prompt("Enter your password to view profile:");
+          if (!password) {
+            throw new Error("Password required to decrypt profile");
+          }
+          
+          // Load user's keys using their password
+          const userKeys = await keyManager.loadUserKeys(user.uid, password);
+          
+          // Decrypt profile data
+          let decryptedProfile = {};
+          if (encryptedData.encryptedProfile) {
+            decryptedProfile = await EncryptionService.decryptUserProfileData(
+              encryptedData.encryptedProfile,
+              userKeys.privateKey
+            );
+          }
+          
+          // Combine decrypted data with non-sensitive data
+          const fullUserData = {
+            ...encryptedData,
+            ...decryptedProfile
+          };
+          
+          setUserData(fullUserData);
+          
+          // Set form data for editing (excluding username which is not editable)
+          const { username, ...editableData } = decryptedProfile;
           setFormData(editableData);
         }
       } catch (err) {
-        setError('Failed to load profile data');
+        console.error('Failed to load/decrypt profile ', err);
+        setError('Failed to load profile data: ' + err.message);
       } finally {
         setLoading(false);
       }
     };
 
-    loadUserData();
+    loadAndDecryptUserData();
   }, [user]);
 
   const handleChange = (e) => {
@@ -69,17 +101,41 @@ const Profile = () => {
     setError(null);
 
     try {
-      await firestore.collection('users').doc(user.uid).update({
+      // Prompt for password to get encryption keys
+      const password = prompt("Enter your password to save changes:");
+      if (!password) {
+        throw new Error("Password required to encrypt profile");
+      }
+      
+      // Load user keys for encryption
+      const userKeys = await keyManager.loadUserKeys(user.uid, password);
+      
+      // Prepare updated profile data
+      const updatedProfile = {
         ...formData,
+        username: userData?.username || '', // Keep original username
+        email: userData?.email || '' // Keep email
+      };
+      
+      // Encrypt updated profile data
+      const encryptedProfile = await EncryptionService.encryptUserProfileData(
+        updatedProfile,
+        userKeys.publicKey
+      );
+      
+      // Update encrypted profile in Firestore
+      await firestore.collection('users').doc(user.uid).update({
+        encryptedProfile: encryptedProfile,
         updatedAt: new Date()
       });
       
-      // Keep the username from the original userData when updating local state
-      setUserData({...userData, ...formData});
+      // Update local state with new data
+      setUserData({...userData, ...updatedProfile});
       setIsEditing(false);
       alert('Profile updated successfully!');
     } catch (err) {
-      setError('Failed to update profile');
+      console.error('Failed to update profile:', err);
+      setError('Failed to update profile: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -104,8 +160,17 @@ const Profile = () => {
       }
 
       // Check password strength
-      if (passwordData.newPassword.length < 6) {
-        throw new Error("New password must be at least 6 characters long");
+      const passwordValidations = {
+        length: passwordData.newPassword.length >= 8,
+        uppercase: /[A-Z]/.test(passwordData.newPassword),
+        lowercase: /[a-z]/.test(passwordData.newPassword),
+        number: /[0-9]/.test(passwordData.newPassword),
+        special: /[!@#$%^&*()_+-={};:|<>?]/.test(passwordData.newPassword)
+      };
+      
+      const isPasswordValid = Object.values(passwordValidations).every(Boolean);
+      if (!isPasswordValid) {
+        throw new Error("New password must meet complexity requirements");
       }
 
       // Update password
@@ -328,8 +393,8 @@ const Profile = () => {
                   type="button" 
                   onClick={() => {
                     setIsEditing(false);
-                    // Reset form data but keep the username from userData
-                    const { username, ...editableData } = userData;
+                    // Reset form data
+                    const { username, ...editableData } = userData || {};
                     setFormData(editableData);
                   }} 
                   className="secondary-button"
@@ -367,6 +432,9 @@ const Profile = () => {
                   className="form-input"
                   required
                 />
+                <div className="password-hint">
+                  Password must contain at least 8 characters, including uppercase, lowercase, number, and special character
+                </div>
               </div>
 
               <div className="form-group">

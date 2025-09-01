@@ -1,5 +1,4 @@
-// src/Pages/Requests.js
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
@@ -95,12 +94,40 @@ const Requests = () => {
     }
   };
 
+  // src/Pages/Requests.js (updated handleRejectRequest function)
   const handleRejectRequest = async (request) => {
     if (window.confirm(`Reject friend request from ${request.username || request.email}?`)) {
       try {
+        const chatQuery = await firestore
+          .collection('chats')
+          .where('users', 'array-contains', user.uid)
+          .get();
+        
+        for (const doc of chatQuery.docs) {
+          const chatData = doc.data();
+          if (chatData.users.includes(request.requesterId) && chatData.users.length === 2) {
+            // Delete all messages in this chat
+            const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
+            const batch = firestore.batch();
+            
+            // Delete all messages
+            messagesQuery.forEach(messageDoc => {
+              batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
+            });
+            
+            // Delete the chat document
+            batch.delete(firestore.doc(`chats/${doc.id}`));
+            
+            // Commit the batch deletion
+            await batch.commit();
+            break;
+          }
+        }
+        
+        // Delete the friend request
         await firestore.collection('friends').doc(request.requestId).delete();
         setRequests(requests.filter(r => r.id !== request.id));
-        alert('Friend request rejected');
+        alert('Friend request rejected and any existing chat deleted');
       } catch (error) {
         console.error('Error rejecting request:', error);
         alert('Failed to reject request: ' + error.message);

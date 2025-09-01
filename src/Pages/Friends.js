@@ -162,21 +162,52 @@ const Friends = () => {
     setProfileData(null);
   };
 
-  const handleUnfriend = async (friend) => {
-    if (window.confirm(`Are you sure you want to unfriend ${friend.username || friend.email}?`)) {
-      try {
-        await firestore.collection('friends').doc(friend.friendshipId).delete();
-        setFriends(friends.filter(f => f.id !== friend.id));
-        if (viewingProfile && viewingProfile.id === friend.id) {
-          handleCloseProfile();
+    const handleUnfriend = async (friend) => {
+        if (window.confirm(`Are you sure you want to unfriend ${friend.username || friend.email}? This will also delete your chat history.`)) {
+            try {
+            // First, find and delete the chat between you and this friend
+            const chatQuery = await firestore
+                .collection('chats')
+                .where('users', 'array-contains', user.uid)
+                .get();
+            
+            for (const doc of chatQuery.docs) {
+                const chatData = doc.data();
+                if (chatData.users.includes(friend.friendId) && chatData.users.length === 2) {
+                // Delete all messages in this chat
+                const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
+                const batch = firestore.batch();
+                
+                // Delete all messages
+                messagesQuery.forEach(messageDoc => {
+                    batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
+                });
+                
+                // Delete the chat document
+                batch.delete(firestore.doc(`chats/${doc.id}`));
+                
+                // Commit the batch deletion
+                await batch.commit();
+                break;
+                }
+            }
+            
+            // Then delete the friendship record
+            await firestore.collection('friends').doc(friend.friendshipId).delete();
+            
+            // Update local state
+            setFriends(friends.filter(f => f.id !== friend.id));
+            if (viewingProfile && viewingProfile.id === friend.id) {
+                handleCloseProfile();
+            }
+            
+            alert('Friend and chat history removed successfully');
+            } catch (error) {
+            console.error('Error unfriending:', error);
+            alert('Failed to unfriend: ' + error.message);
+            }
         }
-        alert('Friend removed successfully');
-      } catch (error) {
-        console.error('Error unfriending:', error);
-        alert('Failed to unfriend: ' + error.message);
-      }
-    }
-  };
+    };
 
   const handleBack = () => {
     navigate('/userhome');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { firebase, auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { Link, useNavigate } from 'react-router-dom';
@@ -300,40 +300,55 @@ function UserHome() {
         <main className="main-panel">
           {showAddFriend ? (
             <div className="add-friend-panel">
-              <h2>Add Friends</h2>
-              <div className="search-container">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Enter username or email"
-                  className="search-input"
-                />
-                <button onClick={handleSearchUsers} disabled={searching} className="search-button">
-                  {searching ? 'Searching...' : 'Search'}
-                </button>
-              </div>
-              
-              <div className="search-results">
-                {searchResults.length > 0 ? (
-                  <ul className="results-list">
-                    {searchResults.map(user => (
-                      <li key={user.id} className="result-item">
-                        <div className="user-info">
-                          <span className="user-name">{user.email}</span>
-                        </div>
-                        <button 
-                          onClick={() => handleAddFriend(user.id)}
-                          className="add-button"
-                        >
-                          Add Friend
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : searchTerm && !searching ? (
-                  <p className="no-results">No users found</p>
-                ) : null}
+              <div className="add-friend-container">
+                <h2>Add Friends</h2>
+                <div className="search-container">
+                  <div className="search-input-group">
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder="Enter username or email"
+                      className="search-input"
+                      onKeyPress={(e) => e.key === 'Enter' && handleSearchUsers()}
+                    />
+                    <button onClick={handleSearchUsers} disabled={searching} className="search-button">
+                      {searching ? 'Searching...' : 'Search'}
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="search-results">
+                  {searchResults.length > 0 ? (
+                    <div className="results-container">
+                      <h3>Search Results</h3>
+                      <ul className="results-list">
+                        {searchResults.map(user => (
+                          <li key={user.id} className="result-item">
+                            <div className="user-info">
+                              <div className="user-avatar">
+                                <span>{user.email?.charAt(0).toUpperCase() || 'U'}</span>
+                              </div>
+                              <div className="user-details">
+                                <span className="user-name">{user.email}</span>
+                              </div>
+                            </div>
+                            <button 
+                              onClick={() => handleAddFriend(user.id)}
+                              className="add-button"
+                            >
+                              Add Friend
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : searchTerm && !searching ? (
+                    <div className="no-results">
+                      <p>No users found</p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           ) : selectedChat ? (

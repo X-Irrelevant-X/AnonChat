@@ -350,3 +350,153 @@
   justify-content: flex-end;
   gap: 1rem;
 }
+
+.add-friend-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  padding: 20px;
+}
+
+.add-friend-container {
+  background-color: #16213e;
+  border-radius: 10px;
+  padding: 30px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.add-friend-container h2 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: white;
+  font-size: 1.8rem;
+}
+
+.search-container {
+  margin-bottom: 30px;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 20px;
+  background-color: #2d2d44;
+  color: white;
+  font-size: 1rem;
+}
+
+.search-input:focus {
+  outline: 2px solid #6649b8;
+  background-color: #3a3a5c;
+}
+
+.search-button {
+  padding: 12px 24px;
+  background-color: #4c4c9f;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.3s;
+}
+
+.search-button:hover:not(:disabled) {
+  background-color: #6649b8;
+}
+
+.search-button:disabled {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.results-container h3 {
+  color: white;
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+}
+
+.results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #2d2d44;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #4c4c9f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-avatar span {
+  color: white;
+  font-weight: bold;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-name {
+  color: white;
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.add-button {
+  padding: 8px 16px;
+  background-color: #4c4c9f;
+  color: white;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.3s;
+}
+
+.add-button:hover {
+  background-color: #6649b8;
+}
+
+.no-results {
+  text-align: center;
+  color: #ccc;
+  padding: 20px;
+  font-size: 1.1rem;
+}
+
+.no-results p {
+  margin: 0;
+}

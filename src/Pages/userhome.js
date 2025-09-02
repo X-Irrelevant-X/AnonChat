@@ -632,8 +632,10 @@ function ChatView({ chat, currentUser }) {
           }
 
           return (
-            <div key={msg.id} className={`message ${msg.uid === auth.currentUser.uid ? 'sent' : 'received'}`}>
-              <p>{displayText}</p>
+            <div key={msg.id} className={`message-container ${msg.uid === auth.currentUser.uid ? 'sent' : 'received'}`}>
+              <div className={`message ${msg.uid === auth.currentUser.uid ? 'sent' : 'received'}`}>
+                <p>{displayText}</p>
+              </div>
               <span className="message-time">
                 {msg.createdAt && new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>

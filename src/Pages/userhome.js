@@ -259,18 +259,29 @@ function UserHome() {
         );
       }
       
-      // Create friend request with current user's profile info
+      // Prepare user data for encryption
+      const requesterData = {
+        username: currentUserProfile.username || userData.email.split('@')[0],
+        email: userData.email,
+        firstName: currentUserProfile.firstName || '',
+        lastName: currentUserProfile.lastName || '',
+        birthday: currentUserProfile.birthday || '',
+        gender: currentUserProfile.gender || ''
+      };
+
+      // Encrypt requester's data using symmetric encryption
+      const encryptedRequesterData = await EncryptionService.encryptFriendData(
+        requesterData, 
+        user.uid, 
+        friendId
+      );
+      
+      // Create friend request with encrypted requester's profile info
       await firestore.collection('friends').add({
         user1: user.uid, // Requester
         user2: friendId, // Request recipient
         user1PublicKey: exportedCurrentUserPublicKey, // Requester's public key
-        user1Username: currentUserProfile.username || userData.email.split('@')[0], // Requester's username
-        user1Email: userData.email, // Requester's email
-        user1FirstName: currentUserProfile.firstName || '', // Requester's first name
-        user1LastName: currentUserProfile.lastName || '', // Requester's last name
-        user1Birthday: currentUserProfile.birthday || '', // Requester's birthday
-        user1Gender: currentUserProfile.gender || '', // Requester's gender
-        
+        encryptedUser1Data: encryptedRequesterData, // Encrypted requester data
         createdAt: new Date(),
         status: 'pending'
       });

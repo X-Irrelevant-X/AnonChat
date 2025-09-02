@@ -3,8 +3,8 @@ import { auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
 import sessionManager from '../security/sessionManager';
+import EncryptionService from '../security/encrydecry';
 import '../Styles/friends.css';
-
 
 const Friends = () => {
   const [user] = useAuthState(auth);
@@ -42,32 +42,102 @@ const Friends = () => {
 
         const friendList = [];
         
+        // Process friends where current user is user1
         for (const doc of friendsQuery1.docs) {
           const friendData = doc.data();
+          let decryptedFriendInfo = {};
+          
+          // Try to decrypt user2's data (the friend's data)
+          if (friendData.encryptedUser2Data) {
+            try {
+              decryptedFriendInfo = await EncryptionService.decryptFriendData(
+                friendData.encryptedUser2Data,
+                user.uid,
+                friendData.user2
+              );
+            } catch (decryptError) {
+              console.error('Failed to decrypt friend data:', decryptError);
+              // Fallback for old unencrypted data
+              decryptedFriendInfo = {
+                username: friendData.user2Username || 'Unknown User',
+                email: friendData.user2Email || '',
+                firstName: friendData.user2FirstName || '',
+                lastName: friendData.user2LastName || '',
+                birthday: friendData.user2Birthday || '',
+                gender: friendData.user2Gender || ''
+              };
+            }
+          } else {
+            // Fallback for old unencrypted data
+            decryptedFriendInfo = {
+              username: friendData.user2Username || 'Unknown User',
+              email: friendData.user2Email || '',
+              firstName: friendData.user2FirstName || '',
+              lastName: friendData.user2LastName || '',
+              birthday: friendData.user2Birthday || '',
+              gender: friendData.user2Gender || ''
+            };
+          }
+          
           friendList.push({
             id: doc.id,
             friendId: friendData.user2,
-            username: friendData.user2Username || 'Unknown User',
-            email: friendData.user2Email || '',
-            firstName: friendData.user2FirstName || '',
-            lastName: friendData.user2LastName || '',
-            birthday: friendData.user2Birthday || '',
-            gender: friendData.user2Gender || '',
+            username: decryptedFriendInfo.username,
+            email: decryptedFriendInfo.email,
+            firstName: decryptedFriendInfo.firstName,
+            lastName: decryptedFriendInfo.lastName,
+            birthday: decryptedFriendInfo.birthday,
+            gender: decryptedFriendInfo.gender,
             friendshipId: doc.id
           });
         }
         
+        // Process friends where current user is user2
         for (const doc of friendsQuery2.docs) {
           const friendData = doc.data();
+          let decryptedFriendInfo = {};
+          
+          // Try to decrypt user1's data (the friend's data)
+          if (friendData.encryptedUser1Data) {
+            try {
+              decryptedFriendInfo = await EncryptionService.decryptFriendData(
+                friendData.encryptedUser1Data,
+                friendData.user1,
+                user.uid
+              );
+            } catch (decryptError) {
+              console.error('Failed to decrypt friend data:', decryptError);
+              // Fallback for old unencrypted data
+              decryptedFriendInfo = {
+                username: friendData.user1Username || 'Unknown User',
+                email: friendData.user1Email || '',
+                firstName: friendData.user1FirstName || '',
+                lastName: friendData.user1LastName || '',
+                birthday: friendData.user1Birthday || '',
+                gender: friendData.user1Gender || ''
+              };
+            }
+          } else {
+            // Fallback for old unencrypted data
+            decryptedFriendInfo = {
+              username: friendData.user1Username || 'Unknown User',
+              email: friendData.user1Email || '',
+              firstName: friendData.user1FirstName || '',
+              lastName: friendData.user1LastName || '',
+              birthday: friendData.user1Birthday || '',
+              gender: friendData.user1Gender || ''
+            };
+          }
+          
           friendList.push({
             id: doc.id,
             friendId: friendData.user1,
-            username: friendData.user1Username || 'Unknown User',
-            email: friendData.user1Email || '',
-            firstName: friendData.user1FirstName || '',
-            lastName: friendData.user1LastName || '',
-            birthday: friendData.user1Birthday || '',
-            gender: friendData.user1Gender || '',
+            username: decryptedFriendInfo.username,
+            email: decryptedFriendInfo.email,
+            firstName: decryptedFriendInfo.firstName,
+            lastName: decryptedFriendInfo.lastName,
+            birthday: decryptedFriendInfo.birthday,
+            gender: decryptedFriendInfo.gender,
             friendshipId: doc.id
           });
         }
@@ -104,26 +174,49 @@ const Friends = () => {
         const friendshipDoc = await firestore.collection('friends').doc(friend.friendshipId).get();
         const friendshipData = friendshipDoc.data();
         
+        // Create userInfo object with decrypted data
+        const userInfo = {};
+        
+        // Decrypt current user's data
+        if (friendshipData.encryptedUser1Data && friendshipData.user1 === user.uid) {
+          try {
+            const decryptedUser1Data = await EncryptionService.decryptFriendData(
+              friendshipData.encryptedUser1Data,
+              friendshipData.user1,
+              friendshipData.user2
+            );
+            userInfo[user.uid] = decryptedUser1Data;
+          } catch (error) {
+            console.error('Failed to decrypt user1 data for chat:', error);
+            userInfo[user.uid] = { username: 'Unknown', email: '' };
+          }
+        } else if (friendshipData.encryptedUser2Data && friendshipData.user2 === user.uid) {
+          try {
+            const decryptedUser2Data = await EncryptionService.decryptFriendData(
+              friendshipData.encryptedUser2Data,
+              friendshipData.user1,
+              friendshipData.user2
+            );
+            userInfo[user.uid] = decryptedUser2Data;
+          } catch (error) {
+            console.error('Failed to decrypt user2 data for chat:', error);
+            userInfo[user.uid] = { username: 'Unknown', email: '' };
+          }
+        }
+        
+        // Add friend's data
+        userInfo[friend.friendId] = {
+          username: friend.username,
+          email: friend.email,
+          firstName: friend.firstName,
+          lastName: friend.lastName
+        };
         
         const chatData = {
           users: [user.uid, friend.friendId],
           user1PublicKey: friendshipData.user1PublicKey,
           user2PublicKey: friendshipData.user2PublicKey,
-          
-          userInfo: {
-            [user.uid]: {
-              username: friendshipData.user1 === user.uid ? friendshipData.user1Username : friendshipData.user2Username,
-              email: friendshipData.user1 === user.uid ? friendshipData.user1Email : friendshipData.user2Email,
-              firstName: friendshipData.user1 === user.uid ? friendshipData.user1FirstName : friendshipData.user2FirstName,
-              lastName: friendshipData.user1 === user.uid ? friendshipData.user1LastName : friendshipData.user2LastName
-            },
-            [friend.friendId]: {
-              username: friend.username,
-              email: friend.email,
-              firstName: friend.firstName,
-              lastName: friend.lastName
-            }
-          },
+          userInfo: userInfo,
           createdAt: new Date(),
           createdBy: user.uid
         };
@@ -296,17 +389,19 @@ const Friends = () => {
             Add Friends
           </button>
         </div>
+
+        //From here below stuff needs to change for decryption and viewing
       ) : (
         <div className="friends-list">
           {friends.map(friend => (
             <div key={friend.id} className="friend-item">
               <div className="friend-info" onClick={() => handleStartChat(friend)}>
                 <div className="friend-avatar">
-                  <span>{friend.username?.charAt(0) || friend.email?.charAt(0) || 'U'}</span>
+                  <span>{friend.username?.charAt(0)?.toUpperCase() || friend.email?.charAt(0)?.toUpperCase() || 'U'}</span>
                 </div>
                 <div className="friend-details">
                   <h3>{friend.username || 'Unknown User'}</h3>
-                  <p>{friend.email}</p>
+                  <p>{friend.email || 'No email provided'}</p>
                 </div>
               </div>
               <div className="friend-actions">

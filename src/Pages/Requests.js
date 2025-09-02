@@ -1,11 +1,27 @@
 import { useState, useEffect } from 'react';
-import { auth, firestore } from '../firebase';
+import { auth } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
 import sessionManager from '../security/sessionManager';
 import EncryptionService from '../security/encrydecry';
 import '../Styles/requests.css';
 
+// Firestore modular imports
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  deleteField
+} from "firebase/firestore";
+
+const firestore = getFirestore();
 
 const Requests = () => {
   const [user] = useAuthState(auth);
@@ -19,45 +35,63 @@ const Requests = () => {
     const loadRequests = async () => {
       try {
         setLoading(true);
-        
-        // Check if session is active
+
         if (!sessionManager.isSessionActive()) {
           auth.signOut();
           navigate('/signin');
           return;
         }
 
-        const requestsQuery = await firestore
-          .collection('friends')
-          .where('user2', '==', user.uid)
-          .where('status', '==', 'pending')
-          .get();
+        const requestsQuery = query(
+          collection(firestore, 'friends'),
+          where('user2', '==', user.uid),
+          where('status', '==', 'pending')
+        );
+
+        const requestsSnapshot = await getDocs(requestsQuery);
 
         const requestList = [];
-        
-        for (const doc of requestsQuery.docs) {
-          const requestData = doc.data();
-          
-          const requesterDoc = await firestore.collection('users').doc(requestData.user1).get();
-          if (requesterDoc.exists) {
-            
-            const requestInfo = {
-              id: doc.id,
-              requesterId: requestData.user1,
+        for (const docSnap of requestsSnapshot.docs) {
+          const requestData = docSnap.data();
+          let decryptedRequesterData = {};
+
+          if (requestData.encryptedUser1Data) {
+            try {
+              decryptedRequesterData = await EncryptionService.decryptFriendData(
+                requestData.encryptedUser1Data,
+                requestData.user1,
+                user.uid
+              );
+            } catch (err) {
+              console.error('Failed to decrypt requester data:', err);
+              decryptedRequesterData = { username: 'Unknown User', email: 'Unknown Email' };
+            }
+          } else {
+            decryptedRequesterData = {
               username: requestData.user1Username || 'Unknown User',
               email: requestData.user1Email || '',
               firstName: requestData.user1FirstName || '',
               lastName: requestData.user1LastName || '',
               birthday: requestData.user1Birthday || '',
-              gender: requestData.user1Gender || '',
-              requestId: doc.id,
-              createdAt: requestData.createdAt
+              gender: requestData.user1Gender || ''
             };
-            
-            requestList.push(requestInfo);
           }
+
+          requestList.push({
+            id: docSnap.id,
+            requesterId: requestData.user1,
+            username: decryptedRequesterData.username,
+            email: decryptedRequesterData.email,
+            firstName: decryptedRequesterData.firstName || '',
+            lastName: decryptedRequesterData.lastName || '',
+            birthday: decryptedRequesterData.birthday || '',
+            gender: decryptedRequesterData.gender || '',
+            requestId: docSnap.id,
+            createdAt: requestData.createdAt,
+            user1PublicKey: requestData.user1PublicKey
+          });
         }
-        
+
         setRequests(requestList);
       } catch (error) {
         console.error('Error loading requests:', error);
@@ -88,18 +122,11 @@ const Requests = () => {
     try {
       const currentUserPublicKey = sessionManager.getPublicKey();
       const exportedCurrentUserPublicKey = await exportPublicKeyToString(currentUserPublicKey);
-      
-      const requesterDoc = await firestore.collection('users').doc(request.requesterId).get();
-      if (!requesterDoc.exists) {
-        throw new Error('Requester not found');
-      }
-      
-      const requesterData = requesterDoc.data();
-      const requesterPublicKey = requesterData.publicKey;
-      
-      const userDoc = await firestore.collection('users').doc(user.uid).get();
-      const userData = userDoc.data();
-      
+
+      const userDocRef = doc(firestore, 'users', user.uid);
+      const userDocSnap = await getDoc(userDocRef);
+      const userData = userDocSnap.data();
+
       const privateKey = sessionManager.getPrivateKey();
       let currentUserProfile = {};
       if (userData.encryptedProfile) {
@@ -108,27 +135,61 @@ const Requests = () => {
           privateKey
         );
       }
-      
-      await firestore.collection('friends').doc(request.requestId).update({
+
+      const user1Data = {
+        username: request.username,
+        email: request.email,
+        firstName: request.firstName,
+        lastName: request.lastName,
+        birthday: request.birthday,
+        gender: request.gender
+      };
+
+      const user2Data = {
+        username: currentUserProfile.username || userData.email.split('@')[0],
+        email: userData.email,
+        firstName: currentUserProfile.firstName || '',
+        lastName: currentUserProfile.lastName || '',
+        birthday: currentUserProfile.birthday || '',
+        gender: currentUserProfile.gender || ''
+      };
+
+      const encryptedUser1Data = await EncryptionService.encryptFriendData(
+        user1Data,
+        request.requesterId,
+        user.uid
+      );
+
+      const encryptedUser2Data = await EncryptionService.encryptFriendData(
+        user2Data,
+        request.requesterId,
+        user.uid
+      );
+
+      const requestRef = doc(firestore, 'friends', request.requestId);
+      await updateDoc(requestRef, {
         status: 'accepted',
-        user1PublicKey: requesterPublicKey, 
-        user2PublicKey: exportedCurrentUserPublicKey, 
-        user1Username: request.username, 
-        user1Email: request.email, 
-        user1FirstName: request.firstName, 
-        user1LastName: request.lastName, 
-        user1Birthday: request.birthday, 
-        user1Gender: request.gender, 
-        user2Username: currentUserProfile.username || userData.email.split('@')[0], 
-        user2Email: userData.email, 
-        user2FirstName: currentUserProfile.firstName || '',
-        user2LastName: currentUserProfile.lastName || '', 
-        user2Birthday: currentUserProfile.birthday || '',
-        user2Gender: currentUserProfile.gender || '', 
-        acceptedAt: new Date()
+        user1PublicKey: request.user1PublicKey,
+        user2PublicKey: exportedCurrentUserPublicKey,
+        encryptedUser1Data,
+        encryptedUser2Data,
+        acceptedAt: new Date(),
+
+        // remove plaintext
+        user1Username: deleteField(),
+        user1Email: deleteField(),
+        user1FirstName: deleteField(),
+        user1LastName: deleteField(),
+        user1Birthday: deleteField(),
+        user1Gender: deleteField(),
+        user2Username: deleteField(),
+        user2Email: deleteField(),
+        user2FirstName: deleteField(),
+        user2LastName: deleteField(),
+        user2Birthday: deleteField(),
+        user2Gender: deleteField()
       });
-      
-      // Remove from requests list
+
       setRequests(requests.filter(r => r.id !== request.id));
       alert('Friend request accepted!');
     } catch (error) {
@@ -140,34 +201,30 @@ const Requests = () => {
   const handleRejectRequest = async (request) => {
     if (window.confirm(`Reject friend request from ${request.username || request.email}?`)) {
       try {
-        const chatQuery = await firestore
-          .collection('chats')
-          .where('users', 'array-contains', user.uid)
-          .get();
-        
-        for (const doc of chatQuery.docs) {
-          const chatData = doc.data();
+        const chatQuery = query(
+          collection(firestore, 'chats'),
+          where('users', 'array-contains', user.uid)
+        );
+        const chatSnap = await getDocs(chatQuery);
+
+        for (const chatDoc of chatSnap.docs) {
+          const chatData = chatDoc.data();
           if (chatData.users.includes(request.requesterId) && chatData.users.length === 2) {
-            
-            const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
-            const batch = firestore.batch();
-            
-            
-            messagesQuery.forEach(messageDoc => {
-              batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
+            const messagesRef = collection(firestore, `chats/${chatDoc.id}/messages`);
+            const messagesSnap = await getDocs(messagesRef);
+
+            const batch = writeBatch(firestore);
+            messagesSnap.forEach((msg) => {
+              batch.delete(doc(firestore, `chats/${chatDoc.id}/messages/${msg.id}`));
             });
-            
-            
-            batch.delete(firestore.doc(`chats/${doc.id}`));
-            
-            
+
+            batch.delete(doc(firestore, 'chats', chatDoc.id));
             await batch.commit();
             break;
           }
         }
-        
-        
-        await firestore.collection('friends').doc(request.requestId).delete();
+
+        await deleteDoc(doc(firestore, 'friends', request.requestId));
         setRequests(requests.filter(r => r.id !== request.id));
         alert('Friend request rejected and any existing chat deleted');
       } catch (error) {
@@ -177,9 +234,7 @@ const Requests = () => {
     }
   };
 
-  const handleBack = () => {
-    navigate('/userhome');
-  };
+  const handleBack = () => navigate('/userhome');
 
   if (loading) {
     return (
@@ -199,11 +254,9 @@ const Requests = () => {
         <button onClick={handleBack} className="back-button">← Back</button>
         <h1>Friend Requests ({requests.length})</h1>
       </div>
-      
+
       {requests.length === 0 ? (
-        <div className="no-requests">
-          <p>No pending friend requests.</p>
-        </div>
+        <div className="no-requests"><p>No pending friend requests.</p></div>
       ) : (
         <div className="requests-list">
           {requests.map(request => (
@@ -221,16 +274,10 @@ const Requests = () => {
                 </div>
               </div>
               <div className="request-actions">
-                <button 
-                  onClick={() => handleAcceptRequest(request)}
-                  className="action-button accept"
-                >
+                <button onClick={() => handleAcceptRequest(request)} className="action-button accept">
                   Accept
                 </button>
-                <button 
-                  onClick={() => handleRejectRequest(request)}
-                  className="action-button reject"
-                >
+                <button onClick={() => handleRejectRequest(request)} className="action-button reject">
                   Reject
                 </button>
               </div>

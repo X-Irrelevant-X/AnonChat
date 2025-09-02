@@ -1,6 +1,5 @@
 import cryptoManager from './crypto';
 
-
 class EncryptionService {
   constructor() {
     this.crypto = cryptoManager;
@@ -12,7 +11,7 @@ class EncryptionService {
         userData,
         userPublicKey
       );
-      
+     
       return {
         data: encryptedData,
         timestamp: new Date().toISOString()
@@ -28,7 +27,7 @@ class EncryptionService {
         encryptedData.data,
         userPrivateKey
       );
-      
+     
       return decryptedData;
     } catch (error) {
       throw new Error('Failed to decrypt user profile data: ' + error.message);
@@ -41,12 +40,12 @@ class EncryptionService {
         text: message,
         timestamp: new Date().toISOString()
       };
-      
+     
       const encryptedData = await this.crypto.encryptWithPublicKey(
         messageData,
         recipientPublicKey
       );
-      
+     
       return {
         encryptedMessage: encryptedData,
         timestamp: new Date().toISOString()
@@ -62,7 +61,7 @@ class EncryptionService {
         encryptedMessage.encryptedMessage,
         userPrivateKey
       );
-      
+     
       return decryptedData;
     } catch (error) {
       throw new Error('Failed to decrypt chat message: ' + error.message);
@@ -86,37 +85,157 @@ class EncryptionService {
   }
 
   async encryptWithAES(data, recipientPublicKey) {
-    const aesKey = crypto.randomBytes(32);
-    const iv = crypto.randomBytes(16);
+    try {
+      const aesKey = await window.crypto.subtle.generateKey(
+        {
+          name: "AES-GCM",
+          length: 256
+        },
+        true,
+        ["encrypt", "decrypt"]
+      );
 
-    const cipher = crypto.createCipheriv('aes-256-cbc', aesKey, iv);
-    let encryptedData = cipher.update(JSON.stringify(data), 'utf8', 'base64');
-    encryptedData += cipher.final('base64');
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
-    const encryptedKey = await this.crypto.encryptWithPublicKey(aesKey.toString('base64'), recipientPublicKey);
+      const encodedData = new TextEncoder().encode(JSON.stringify(data));
+      const encryptedData = await window.crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv: iv
+        },
+        aesKey,
+        encodedData
+      );
 
-    return {
-      encryptedKey,
-      iv: iv.toString('base64'),
-      data: encryptedData,
-      timestamp: new Date().toISOString()
-    };
+      const exportedAesKey = await window.crypto.subtle.exportKey("raw", aesKey);
+      const aesKeyBase64 = this.arrayBufferToBase64(exportedAesKey);
+
+      const encryptedKey = await this.crypto.encryptWithPublicKey(aesKeyBase64, recipientPublicKey);
+
+      return {
+        encryptedKey,
+        iv: this.arrayBufferToBase64(iv),
+        data: this.arrayBufferToBase64(encryptedData),
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      throw new Error('Failed to encrypt with AES: ' + error.message);
+    }
   }
 
   async decryptWithAES(encryptedPacket, userPrivateKey) {
-    const aesKeyBase64 = await this.crypto.decryptWithPrivateKey(encryptedPacket.encryptedKey, userPrivateKey);
-    const aesKey = Buffer.from(aesKeyBase64, 'base64');
+    try {
+      const aesKeyBase64 = await this.crypto.decryptWithPrivateKey(encryptedPacket.encryptedKey, userPrivateKey);
+      const aesKeyBuffer = this.base64ToArrayBuffer(aesKeyBase64);
 
-    const iv = Buffer.from(encryptedPacket.iv, 'base64');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
-    let decrypted = decipher.update(encryptedPacket.data, 'base64', 'utf8');
-    decrypted += decipher.final('utf8');
+      const aesKey = await window.crypto.subtle.importKey(
+        "raw",
+        aesKeyBuffer,
+        {
+          name: "AES-GCM",
+          length: 256
+        },
+        false,
+        ["decrypt"]
+      );
+      const iv = this.base64ToArrayBuffer(encryptedPacket.iv);
+      const encryptedData = this.base64ToArrayBuffer(encryptedPacket.data);
 
-    return JSON.parse(decrypted);
+      const decryptedData = await window.crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: iv
+        },
+        aesKey,
+        encryptedData
+      );
+
+      const decryptedText = new TextDecoder().decode(decryptedData);
+      return JSON.parse(decryptedText);
+    } catch (error) {
+      throw new Error('Failed to decrypt with AES: ' + error.message);
+    }
+  }
+
+  arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  base64ToArrayBuffer(base64) {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  async generateSharedKey(user1Id, user2Id) {
+    const seed = [user1Id, user2Id].sort().join('|');
+    const seedBuffer = new TextEncoder().encode(seed);
+    
+    const keyMaterial = await window.crypto.subtle.digest('SHA-256', seedBuffer);
+    
+    return await window.crypto.subtle.importKey(
+      'raw',
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+  async encryptFriendData(data, user1Id, user2Id) {
+    try {
+      const sharedKey = await this.generateSharedKey(user1Id, user2Id);
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      
+      const encodedData = new TextEncoder().encode(JSON.stringify(data));
+      const encryptedData = await window.crypto.subtle.encrypt(
+        {
+          name: "AES-GCM",
+          iv: iv
+        },
+        sharedKey,
+        encodedData
+      );
+
+      return {
+        data: this.arrayBufferToBase64(encryptedData),
+        iv: this.arrayBufferToBase64(iv),
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      throw new Error('Failed to encrypt friend data: ' + error.message);
+    }
+  }
+
+  async decryptFriendData(encryptedPacket, user1Id, user2Id) {
+    try {
+      const sharedKey = await this.generateSharedKey(user1Id, user2Id);
+      const iv = this.base64ToArrayBuffer(encryptedPacket.iv);
+      const encryptedData = this.base64ToArrayBuffer(encryptedPacket.data);
+
+      const decryptedData = await window.crypto.subtle.decrypt(
+        {
+          name: "AES-GCM",
+          iv: iv
+        },
+        sharedKey,
+        encryptedData
+      );
+
+      const decryptedText = new TextDecoder().decode(decryptedData);
+      return JSON.parse(decryptedText);
+    } catch (error) {
+      throw new Error('Failed to decrypt friend data: ' + error.message);
+    }
   }
 }
 
-
 const encryptionService = new EncryptionService();
-
 export default encryptionService;

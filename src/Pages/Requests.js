@@ -38,15 +38,26 @@ const Requests = () => {
         
         for (const doc of requestsQuery.docs) {
           const requestData = doc.data();
+          
+          // Get requester's user document to get their profile info
           const requesterDoc = await firestore.collection('users').doc(requestData.user1).get();
           if (requesterDoc.exists) {
-            requestList.push({
+            
+            // Extract profile information from the friendship document
+            const requestInfo = {
               id: doc.id,
               requesterId: requestData.user1,
-              ...requesterDoc.data(),
+              username: requestData.user1Username || 'Unknown User',
+              email: requestData.user1Email || '',
+              firstName: requestData.user1FirstName || '',
+              lastName: requestData.user1LastName || '',
+              birthday: requestData.user1Birthday || '',
+              gender: requestData.user1Gender || '',
               requestId: doc.id,
               createdAt: requestData.createdAt
-            });
+            };
+            
+            requestList.push(requestInfo);
           }
         }
         
@@ -61,6 +72,22 @@ const Requests = () => {
 
     loadRequests();
   }, [user, navigate]);
+
+  // Helper function to export public key to string
+  const exportPublicKeyToString = async (key) => {
+    const exported = await window.crypto.subtle.exportKey("spki", key);
+    return arrayBufferToBase64(exported);
+  };
+
+  // Helper function to convert ArrayBuffer to base64
+  const arrayBufferToBase64 = (buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  };
 
   const handleAcceptRequest = async (request) => {
     try {
@@ -77,11 +104,37 @@ const Requests = () => {
       const requesterData = requesterDoc.data();
       const requesterPublicKey = requesterData.publicKey; // Already exported string
       
-      // Update friendship status to accepted and store both public keys
+      // Get current user's profile data (decrypted with their own private key)
+      const userDoc = await firestore.collection('users').doc(user.uid).get();
+      const userData = userDoc.data();
+      
+      // Decrypt current user's profile with their own private key
+      const privateKey = sessionManager.getPrivateKey();
+      let currentUserProfile = {};
+      if (userData.encryptedProfile) {
+        currentUserProfile = await EncryptionService.decryptUserProfileData(
+          userData.encryptedProfile,
+          privateKey
+        );
+      }
+      
+      // Update friendship status to accepted and store both users' profile info
       await firestore.collection('friends').doc(request.requestId).update({
         status: 'accepted',
         user1PublicKey: requesterPublicKey, // Requester's public key
         user2PublicKey: exportedCurrentUserPublicKey, // Current user's public key
+        user1Username: request.username, // Requester's username
+        user1Email: request.email, // Requester's email
+        user1FirstName: request.firstName, // Requester's first name
+        user1LastName: request.lastName, // Requester's last name
+        user1Birthday: request.birthday, // Requester's birthday
+        user1Gender: request.gender, // Requester's gender
+        user2Username: currentUserProfile.username || userData.email.split('@')[0], // Current user's username
+        user2Email: userData.email, // Current user's email
+        user2FirstName: currentUserProfile.firstName || '', // Current user's first name
+        user2LastName: currentUserProfile.lastName || '', // Current user's last name
+        user2Birthday: currentUserProfile.birthday || '', // Current user's birthday
+        user2Gender: currentUserProfile.gender || '', // Current user's gender
         acceptedAt: new Date()
       });
       
@@ -94,10 +147,10 @@ const Requests = () => {
     }
   };
 
-  // src/Pages/Requests.js (updated handleRejectRequest function)
   const handleRejectRequest = async (request) => {
     if (window.confirm(`Reject friend request from ${request.username || request.email}?`)) {
       try {
+        // Delete any existing chat between these users (if exists)
         const chatQuery = await firestore
           .collection('chats')
           .where('users', 'array-contains', user.uid)
@@ -133,22 +186,6 @@ const Requests = () => {
         alert('Failed to reject request: ' + error.message);
       }
     }
-  };
-
-  // Helper function to export public key to string
-  const exportPublicKeyToString = async (key) => {
-    const exported = await window.crypto.subtle.exportKey("spki", key);
-    return arrayBufferToBase64(exported);
-  };
-
-  // Helper function to convert ArrayBuffer to base64
-  const arrayBufferToBase64 = (buffer) => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
   };
 
   const handleBack = () => {

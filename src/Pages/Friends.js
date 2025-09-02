@@ -3,9 +3,7 @@ import { auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
 import sessionManager from '../security/sessionManager';
-import EncryptionService from '../security/encrydecry';
 import '../Styles/friends.css';
-
 
 const Friends = () => {
   const [user] = useAuthState(auth);
@@ -49,29 +47,33 @@ const Friends = () => {
         // Process friends where current user is user1
         for (const doc of friendsQuery1.docs) {
           const friendData = doc.data();
-          const friendUserDoc = await firestore.collection('users').doc(friendData.user2).get();
-          if (friendUserDoc.exists) {
-            friendList.push({
-              id: doc.id,
-              friendId: friendData.user2,
-              ...friendUserDoc.data(),
-              friendshipId: doc.id
-            });
-          }
+          friendList.push({
+            id: doc.id,
+            friendId: friendData.user2,
+            username: friendData.user2Username || 'Unknown User',
+            email: friendData.user2Email || '',
+            firstName: friendData.user2FirstName || '',
+            lastName: friendData.user2LastName || '',
+            birthday: friendData.user2Birthday || '',
+            gender: friendData.user2Gender || '',
+            friendshipId: doc.id
+          });
         }
         
         // Process friends where current user is user2
         for (const doc of friendsQuery2.docs) {
           const friendData = doc.data();
-          const friendUserDoc = await firestore.collection('users').doc(friendData.user1).get();
-          if (friendUserDoc.exists) {
-            friendList.push({
-              id: doc.id,
-              friendId: friendData.user1,
-              ...friendUserDoc.data(),
-              friendshipId: doc.id
-            });
-          }
+          friendList.push({
+            id: doc.id,
+            friendId: friendData.user1,
+            username: friendData.user1Username || 'Unknown User',
+            email: friendData.user1Email || '',
+            firstName: friendData.user1FirstName || '',
+            lastName: friendData.user1LastName || '',
+            birthday: friendData.user1Birthday || '',
+            gender: friendData.user1Gender || '',
+            friendshipId: doc.id
+          });
         }
         
         setFriends(friendList);
@@ -105,9 +107,15 @@ const Friends = () => {
         // Chat exists, navigate to it
         navigate('/userhome', { state: { selectedChat: existingChat } });
       } else {
-        // Create new chat
+        // Get friendship document to get public keys
+        const friendshipDoc = await firestore.collection('friends').doc(friend.friendshipId).get();
+        const friendshipData = friendshipDoc.data();
+        
+        // Create new encrypted chat
         const newChat = await firestore.collection('chats').add({
           users: [user.uid, friend.friendId],
+          user1PublicKey: friendshipData.user1PublicKey,
+          user2PublicKey: friendshipData.user2PublicKey,
           name: `${friend.username || friend.email}`,
           createdAt: new Date(),
           createdBy: user.uid
@@ -127,28 +135,16 @@ const Friends = () => {
       setProfileLoading(true);
       setViewingProfile(friend);
       
-      // Get private key from session for decryption
-      const privateKey = sessionManager.getPrivateKey();
-      
-      // Load friend's profile data
-      const friendDoc = await firestore.collection('users').doc(friend.friendId).get();
-      if (friendDoc.exists) {
-        const encryptedData = friendDoc.data();
-        
-        // Decrypt profile data if it exists
-        let decryptedProfile = {};
-        if (encryptedData.encryptedProfile) {
-          decryptedProfile = await EncryptionService.decryptUserProfileData(
-            encryptedData.encryptedProfile,
-            privateKey
-          );
-        }
-        
-        setProfileData({
-          ...encryptedData,
-          ...decryptedProfile
-        });
-      }
+      // The profile data is already available in the friend object
+      // from the friendship record (shared at time of friendship establishment)
+      setProfileData({
+        username: friend.username,
+        email: friend.email,
+        firstName: friend.firstName,
+        lastName: friend.lastName,
+        birthday: friend.birthday,
+        gender: friend.gender
+      });
     } catch (error) {
       console.error('Error loading profile:', error);
       alert('Failed to load profile: ' + error.message);
@@ -162,52 +158,52 @@ const Friends = () => {
     setProfileData(null);
   };
 
-    const handleUnfriend = async (friend) => {
-        if (window.confirm(`Are you sure you want to unfriend ${friend.username || friend.email}? This will also delete your chat history.`)) {
-            try {
-            // First, find and delete the chat between you and this friend
-            const chatQuery = await firestore
-                .collection('chats')
-                .where('users', 'array-contains', user.uid)
-                .get();
+  const handleUnfriend = async (friend) => {
+    if (window.confirm(`Are you sure you want to unfriend ${friend.username || friend.email}? This will also delete your chat history.`)) {
+      try {
+        // First, find and delete the chat between you and this friend
+        const chatQuery = await firestore
+          .collection('chats')
+          .where('users', 'array-contains', user.uid)
+          .get();
+        
+        for (const doc of chatQuery.docs) {
+          const chatData = doc.data();
+          if (chatData.users.includes(friend.friendId) && chatData.users.length === 2) {
+            // Delete all messages in this chat
+            const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
+            const batch = firestore.batch();
             
-            for (const doc of chatQuery.docs) {
-                const chatData = doc.data();
-                if (chatData.users.includes(friend.friendId) && chatData.users.length === 2) {
-                // Delete all messages in this chat
-                const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
-                const batch = firestore.batch();
-                
-                // Delete all messages
-                messagesQuery.forEach(messageDoc => {
-                    batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
-                });
-                
-                // Delete the chat document
-                batch.delete(firestore.doc(`chats/${doc.id}`));
-                
-                // Commit the batch deletion
-                await batch.commit();
-                break;
-                }
-            }
+            // Delete all messages
+            messagesQuery.forEach(messageDoc => {
+              batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
+            });
             
-            // Then delete the friendship record
-            await firestore.collection('friends').doc(friend.friendshipId).delete();
+            // Delete the chat document
+            batch.delete(firestore.doc(`chats/${doc.id}`));
             
-            // Update local state
-            setFriends(friends.filter(f => f.id !== friend.id));
-            if (viewingProfile && viewingProfile.id === friend.id) {
-                handleCloseProfile();
-            }
-            
-            alert('Friend and chat history removed successfully');
-            } catch (error) {
-            console.error('Error unfriending:', error);
-            alert('Failed to unfriend: ' + error.message);
-            }
+            // Commit the batch deletion
+            await batch.commit();
+            break;
+          }
         }
-    };
+        
+        // Then delete the friendship record
+        await firestore.collection('friends').doc(friend.friendshipId).delete();
+        
+        // Update local state
+        setFriends(friends.filter(f => f.id !== friend.id));
+        if (viewingProfile && viewingProfile.id === friend.id) {
+          handleCloseProfile();
+        }
+        
+        alert('Friend and chat history removed successfully');
+      } catch (error) {
+        console.error('Error unfriending:', error);
+        alert('Failed to unfriend: ' + error.message);
+      }
+    }
+  };
 
   const handleBack = () => {
     navigate('/userhome');
@@ -242,7 +238,7 @@ const Friends = () => {
           {profileLoading ? (
             <div className="profile-loading">Loading profile...</div>
           ) : profileData ? (
-            <div className="friend-profile-card">
+            <div className="friend-profile-card" textAlign="center">
               <div className="profile-header-section">
                 <div className="profile-avatar">
                   <span className="avatar-initials">
@@ -251,14 +247,18 @@ const Friends = () => {
                 </div>
                 <div className="profile-basic-info">
                   <h2>{profileData?.username || 'Anonymous'}</h2>
-                  <p className="profile-email">{profileData?.email}</p>
                 </div>
               </div>
 
               <div className="profile-view-content">
                 <div className="profile-field">
-                  <label>Name:</label>
+                  <label>Full Name:</label>
                   <span>{`${profileData?.firstName || ''} ${profileData?.lastName || ''}`.trim() || 'Not set'}</span>
+                </div>
+
+                <div className="profile-field">
+                  <label>Email:</label>
+                  <span>{profileData?.email || 'Not set'}</span>
                 </div>
 
                 <div className="profile-field">
@@ -269,11 +269,6 @@ const Friends = () => {
                 <div className="profile-field">
                   <label>Birthday:</label>
                   <span>{profileData?.birthday ? new Date(profileData.birthday).toLocaleDateString() : 'Not set'}</span>
-                </div>
-
-                <div className="profile-field">
-                  <label>Member Since:</label>
-                  <span>{profileData?.createdAt ? new Date(profileData.createdAt.toDate ? profileData.createdAt.toDate() : profileData.createdAt).toLocaleDateString() : 'Unknown'}</span>
                 </div>
 
                 <div className="profile-view-actions">

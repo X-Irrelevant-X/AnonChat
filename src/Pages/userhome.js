@@ -164,7 +164,7 @@ function UserHome() {
     }
   };
 
-  // Add friend function (send friend request)
+  // src/Pages/UserHome.js (updated handleAddFriend function)
   const handleAddFriend = async (friendId) => {
     try {
       // Check if friend request already exists
@@ -189,11 +189,32 @@ function UserHome() {
       const currentUserPublicKey = sessionManager.getPublicKey();
       const exportedCurrentUserPublicKey = await exportPublicKeyToString(currentUserPublicKey);
       
-      // Create friend request
+      // Get current user's profile data (decrypted with their own private key)
+      const userDoc = await firestore.collection('users').doc(user.uid).get();
+      const userData = userDoc.data();
+      
+      // Decrypt current user's profile with their own private key
+      const privateKey = sessionManager.getPrivateKey();
+      let currentUserProfile = {};
+      if (userData.encryptedProfile) {
+        currentUserProfile = await EncryptionService.decryptUserProfileData(
+          userData.encryptedProfile,
+          privateKey
+        );
+      }
+      
+      // Create friend request with current user's profile info
       await firestore.collection('friends').add({
         user1: user.uid, // Requester
         user2: friendId, // Request recipient
         user1PublicKey: exportedCurrentUserPublicKey, // Requester's public key
+        user1Username: currentUserProfile.username || userData.email.split('@')[0], // Requester's username
+        user1Email: userData.email, // Requester's email
+        user1FirstName: currentUserProfile.firstName || '', // Requester's first name
+        user1LastName: currentUserProfile.lastName || '', // Requester's last name
+        user1Birthday: currentUserProfile.birthday || '', // Requester's birthday
+        user1Gender: currentUserProfile.gender || '', // Requester's gender
+        
         createdAt: new Date(),
         status: 'pending'
       });
@@ -398,12 +419,8 @@ function ChatView({ chat }) {
 
   return (
     <div className="chat-view">
-      <div className="chat-header">
+      <div className="chat-header" textAlign="center">
         <h2>{chat.name || 'Chat'}</h2>
-        <div className="chat-notifications">
-          <span>New Message from John Doe</span>
-          <span>New Message from John Doe</span>
-        </div>
       </div>
 
       <div className="chat-messages">

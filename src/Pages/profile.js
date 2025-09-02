@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { firebase, auth, firestore } from '../firebase';
+import { useState, useEffect } from 'react';
+import { auth, firestore } from '../firebase';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useNavigate } from 'react-router-dom';
 import sessionManager from '../security/sessionManager';
@@ -10,15 +10,15 @@ const Profile = () => {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  // const [isChangingPassword, setIsChangingPassword] = useState(false); // Commented out
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [formData, setFormData] = useState({});
+  /* 
   const [passwordData, setPasswordData] = useState({
     oldPassword: '',
     newPassword: '',
     confirmNewPassword: ''
   });
+  */ // Commented out
   const [deletePassword, setDeletePassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -63,9 +63,6 @@ const Profile = () => {
           };
           
           setUserData(fullUserData);
-          
-          const { username, ...editableData } = decryptedProfile;
-          setFormData(editableData);
         }
       } catch (err) {
         console.error('Failed to load/decrypt profile ', err);
@@ -80,64 +77,20 @@ const Profile = () => {
     loadAndDecryptUserData();
   }, [user, navigate]);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
+  /*
   const handlePasswordChange = (e) => {
     setPasswordData({
       ...passwordData,
       [e.target.name]: e.target.value
     });
   };
+  */ // Commented out
 
   const handleDeletePasswordChange = (e) => {
     setDeletePassword(e.target.value);
   };
 
-  const handleSave = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    try {
-      // Get public key from session
-      const publicKey = sessionManager.getPublicKey();
-      
-      // Prepare updated profile data
-      const updatedProfile = {
-        ...formData,
-        username: userData?.username || '', // Keep original username
-        email: userData?.email || '' // Keep email
-      };
-      
-      // Encrypt updated profile data
-      const encryptedProfile = await EncryptionService.encryptUserProfileData(
-        updatedProfile,
-        publicKey
-      );
-      
-      // Update encrypted profile in Firestore
-      await firestore.collection('users').doc(user.uid).update({
-        encryptedProfile: encryptedProfile,
-        updatedAt: new Date()
-      });
-      
-      // Update local state with new data
-      setUserData({...userData, ...updatedProfile});
-      setIsEditing(false);
-      alert('Profile updated successfully!');
-    } catch (err) {
-      console.error('Failed to update profile:', err);
-      setError('Failed to update profile: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  /*
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -185,6 +138,7 @@ const Profile = () => {
       setLoading(false);
     }
   };
+  */ // Commented out
 
   const handleDeleteAccount = async (e) => {
     e.preventDefault();
@@ -192,12 +146,8 @@ const Profile = () => {
     setError(null);
 
     try {
-      // Re-authenticate user with password
-      const credential = firebase.auth.EmailAuthProvider.credential(
-        user.email,
-        deletePassword
-      );
-      await user.reauthenticateWithCredential(credential);
+      // Re-authenticate using your session manager
+      await sessionManager.reauthenticate(user.uid, deletePassword);
 
       // Delete user data from Firestore
       await firestore.collection('users').doc(user.uid).delete();
@@ -211,7 +161,14 @@ const Profile = () => {
       alert('Account deleted successfully');
       navigate('/');
     } catch (err) {
-      setError('Failed to delete account: ' + err.message);
+      console.error('Delete account error:', err);
+      if (err.code === 'auth/wrong-password') {
+        setError('Incorrect password. Please try again.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('Too many failed attempts. Please try again later.');
+      } else {
+        setError('Failed to delete account: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -278,7 +235,10 @@ const Profile = () => {
             </div>
           </div>
 
-          {!isEditing && !isChangingPassword && !showDeleteConfirm ? (
+          {/* 
+          {!isChangingPassword && 
+          */} {/* Commented out */}
+          {!showDeleteConfirm ? (
             <div className="profile-view">
               <div className="profile-field">
                 <label>Username:</label>
@@ -306,12 +266,11 @@ const Profile = () => {
               </div>
 
               <div className="profile-buttons">
-                <button onClick={() => setIsEditing(true)} className="primary-button">
-                  Edit Profile
-                </button>
+                {/* 
                 <button onClick={() => setIsChangingPassword(true)} className="secondary-button">
                   Change Password
                 </button>
+                */} {/* Commented out */}
                 <button onClick={() => setShowDeleteConfirm(true)} className="danger-button">
                   Delete Account
                 </button>
@@ -319,93 +278,8 @@ const Profile = () => {
             </div>
           ) : null}
 
-          {/* Edit Profile Form */}
-          {isEditing && (
-            <form onSubmit={handleSave} className="profile-edit">
-              <div className="form-group">
-                <label>Username:</label>
-                <input
-                  type="text"
-                  value={userData?.username || ''}
-                  className="form-input"
-                  disabled
-                  readOnly
-                />
-                <p className="form-help-text">Username cannot be changed</p>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>First Name:</label>
-                  <input
-                    type="text"
-                    name="firstName"
-                    value={formData.firstName || ''}
-                    onChange={handleChange}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Last Name:</label>
-                  <input
-                    type="text"
-                    name="lastName"
-                    value={formData.lastName || ''}
-                    onChange={handleChange}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Gender:</label>
-                  <select
-                    name="gender"
-                    value={formData.gender || ''}
-                    onChange={handleChange}
-                    className="form-input"
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                    <option value="prefer-not-to-say">Prefer not to say</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Birthday:</label>
-                  <input
-                    type="date"
-                    name="birthday"
-                    value={formData.birthday || ''}
-                    onChange={handleChange}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="profile-buttons">
-                <button type="submit" className="primary-button" disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => {
-                    setIsEditing(false);
-                    // Reset form data
-                    const { username, ...editableData } = userData || {};
-                    setFormData(editableData);
-                  }} 
-                  className="secondary-button"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-
           {/* Change Password Form */}
+          {/* 
           {isChangingPassword && (
             <form onSubmit={handleChangePassword} className="profile-edit">
               <h3>Change Password</h3>
@@ -470,6 +344,7 @@ const Profile = () => {
               </div>
             </form>
           )}
+          */} {/* Commented out */}
 
           {/* Delete Account Form */}
           {showDeleteConfirm && (

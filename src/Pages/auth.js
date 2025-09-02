@@ -16,7 +16,6 @@ export function SignIn() {
     try {
       const userCredential = await auth.signInWithEmailAndPassword(email, password);
       
-      // Start secure session using your session manager
       await sessionManager.startSession(userCredential.user.uid, password);
       
       navigate('/userhome');
@@ -69,7 +68,7 @@ export function SignIn() {
 export function SignOut() {
   return auth.currentUser && (
     <button className="sign-out-btn" onClick={() => {
-      sessionManager.endSession(); // End session using your session manager
+      sessionManager.endSession();
       auth.signOut();
     }}>
       Sign Out

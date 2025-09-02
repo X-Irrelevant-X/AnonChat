@@ -1,11 +1,11 @@
 import cryptoManager from './crypto';
 
+
 class EncryptionService {
   constructor() {
     this.crypto = cryptoManager;
   }
 
-  // Encrypt user profile data
   async encryptUserProfileData(userData, userPublicKey) {
     try {
       const encryptedData = await this.crypto.encryptWithPublicKey(
@@ -22,7 +22,6 @@ class EncryptionService {
     }
   }
 
-  // Decrypt user profile data
   async decryptUserProfileData(encryptedData, userPrivateKey) {
     try {
       const decryptedData = await this.crypto.decryptWithPrivateKey(
@@ -36,7 +35,6 @@ class EncryptionService {
     }
   }
 
-  // Encrypt chat message
   async encryptChatMessage(message, recipientPublicKey) {
     try {
       const messageData = {
@@ -58,7 +56,6 @@ class EncryptionService {
     }
   }
 
-  // Decrypt chat message
   async decryptChatMessage(encryptedMessage, userPrivateKey) {
     try {
       const decryptedData = await this.crypto.decryptWithPrivateKey(
@@ -72,7 +69,6 @@ class EncryptionService {
     }
   }
 
-  // Encrypt any generic data
   async encryptData(data, publicKey) {
     try {
       return await this.crypto.encryptWithPublicKey(data, publicKey);
@@ -81,7 +77,6 @@ class EncryptionService {
     }
   }
 
-  // Decrypt any generic data
   async decryptData(encryptedData, privateKey) {
     try {
       return await this.crypto.decryptWithPrivateKey(encryptedData, privateKey);
@@ -91,20 +86,17 @@ class EncryptionService {
   }
 
   async encryptWithAES(data, recipientPublicKey) {
-    // 1. Generate AES key + IV
-    const aesKey = crypto.randomBytes(32); // AES-256
+    const aesKey = crypto.randomBytes(32);
     const iv = crypto.randomBytes(16);
 
-    // 2. Encrypt the data with AES
     const cipher = crypto.createCipheriv('aes-256-cbc', aesKey, iv);
     let encryptedData = cipher.update(JSON.stringify(data), 'utf8', 'base64');
     encryptedData += cipher.final('base64');
 
-    // 3. Encrypt AES key with RSA
     const encryptedKey = await this.crypto.encryptWithPublicKey(aesKey.toString('base64'), recipientPublicKey);
 
     return {
-      encryptedKey, // RSA-protected AES key
+      encryptedKey,
       iv: iv.toString('base64'),
       data: encryptedData,
       timestamp: new Date().toISOString()
@@ -112,11 +104,9 @@ class EncryptionService {
   }
 
   async decryptWithAES(encryptedPacket, userPrivateKey) {
-    // 1. Decrypt AES key with RSA
     const aesKeyBase64 = await this.crypto.decryptWithPrivateKey(encryptedPacket.encryptedKey, userPrivateKey);
     const aesKey = Buffer.from(aesKeyBase64, 'base64');
 
-    // 2. Decrypt data with AES
     const iv = Buffer.from(encryptedPacket.iv, 'base64');
     const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
     let decrypted = decipher.update(encryptedPacket.data, 'base64', 'utf8');
@@ -126,7 +116,7 @@ class EncryptionService {
   }
 }
 
-// Create singleton instance
+
 const encryptionService = new EncryptionService();
 
 export default encryptionService;

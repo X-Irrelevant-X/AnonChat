@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import sessionManager from '../security/sessionManager';
 import '../Styles/friends.css';
 
+
 const Friends = () => {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
@@ -14,7 +15,6 @@ const Friends = () => {
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  // Load friends list
   useEffect(() => {
     if (!user) return;
 
@@ -22,14 +22,12 @@ const Friends = () => {
       try {
         setLoading(true);
         
-        // Check if session is active
         if (!sessionManager.isSessionActive()) {
           auth.signOut();
           navigate('/signin');
           return;
         }
 
-        // Get accepted friendships where user is either user1 or user2
         const friendsQuery1 = await firestore
           .collection('friends')
           .where('user1', '==', user.uid)
@@ -44,7 +42,6 @@ const Friends = () => {
 
         const friendList = [];
         
-        // Process friends where current user is user1
         for (const doc of friendsQuery1.docs) {
           const friendData = doc.data();
           friendList.push({
@@ -60,7 +57,6 @@ const Friends = () => {
           });
         }
         
-        // Process friends where current user is user2
         for (const doc of friendsQuery2.docs) {
           const friendData = doc.data();
           friendList.push({
@@ -89,7 +85,6 @@ const Friends = () => {
 
   const handleStartChat = async (friend) => {
     try {
-      // Check if chat already exists
       const existingChatQuery = await firestore
         .collection('chats')
         .where('users', 'array-contains', user.uid)
@@ -106,16 +101,15 @@ const Friends = () => {
       if (existingChat) {
         navigate('/userhome', { state: { selectedChat: existingChat } });
       } else {
-        // Get friendship document to get public keys and user info
         const friendshipDoc = await firestore.collection('friends').doc(friend.friendshipId).get();
         const friendshipData = friendshipDoc.data();
         
-        // Store user info for dynamic naming (but don't set a static name)
+        
         const chatData = {
           users: [user.uid, friend.friendId],
           user1PublicKey: friendshipData.user1PublicKey,
           user2PublicKey: friendshipData.user2PublicKey,
-          // Store user information for dynamic naming
+          
           userInfo: {
             [user.uid]: {
               username: friendshipData.user1 === user.uid ? friendshipData.user1Username : friendshipData.user2Username,
@@ -132,7 +126,6 @@ const Friends = () => {
           },
           createdAt: new Date(),
           createdBy: user.uid
-          // Remove static name field - will be generated dynamically
         };
         
         // Create new encrypted chat
@@ -176,7 +169,6 @@ const Friends = () => {
   const handleUnfriend = async (friend) => {
     if (window.confirm(`Are you sure you want to unfriend ${friend.username || friend.email}? This will also delete your chat history.`)) {
       try {
-        // First, find and delete the chat between you and this friend
         const chatQuery = await firestore
           .collection('chats')
           .where('users', 'array-contains', user.uid)
@@ -185,19 +177,16 @@ const Friends = () => {
         for (const doc of chatQuery.docs) {
           const chatData = doc.data();
           if (chatData.users.includes(friend.friendId) && chatData.users.length === 2) {
-            // Delete all messages in this chat
+          
             const messagesQuery = await firestore.collection(`chats/${doc.id}/messages`).get();
             const batch = firestore.batch();
             
-            // Delete all messages
             messagesQuery.forEach(messageDoc => {
               batch.delete(firestore.doc(`chats/${doc.id}/messages/${messageDoc.id}`));
             });
             
-            // Delete the chat document
             batch.delete(firestore.doc(`chats/${doc.id}`));
             
-            // Commit the batch deletion
             await batch.commit();
             break;
           }

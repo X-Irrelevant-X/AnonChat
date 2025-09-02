@@ -8,17 +8,14 @@ class CryptoManager {
     };
   }
 
-  // Convert string to ArrayBuffer
   stringToArrayBuffer(str) {
     return new TextEncoder().encode(str);
   }
 
-  // Convert ArrayBuffer to string
   arrayBufferToString(buffer) {
     return new TextDecoder().decode(buffer);
   }
 
-  // Convert base64 to ArrayBuffer
   base64ToArrayBuffer(base64) {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
@@ -28,7 +25,6 @@ class CryptoManager {
     return bytes.buffer;
   }
 
-  // Convert ArrayBuffer to base64
   arrayBufferToBase64(buffer) {
     const bytes = new Uint8Array(buffer);
     let binary = '';
@@ -38,7 +34,6 @@ class CryptoManager {
     return btoa(binary);
   }
 
-  // Generate RSA key pair
   async generateKeyPair() {
     const keyPair = await window.crypto.subtle.generateKey(
       {
@@ -53,13 +48,11 @@ class CryptoManager {
     return keyPair;
   }
 
-  // Export public key for storage
   async exportPublicKey(key) {
     const exported = await window.crypto.subtle.exportKey("spki", key);
     return this.arrayBufferToBase64(exported);
   }
 
-  // Import public key from storage
   async importPublicKey(keyData) {
     const binaryDer = this.base64ToArrayBuffer(keyData);
     return await window.crypto.subtle.importKey(
@@ -80,7 +73,6 @@ class CryptoManager {
     return this.arrayBufferToBase64(exported);
   }
 
-  // Import private key
   async importPrivateKey(keyData) {
     const binaryDer = this.base64ToArrayBuffer(keyData);
     return await window.crypto.subtle.importKey(
@@ -95,7 +87,6 @@ class CryptoManager {
     );
   }
 
-  // Encrypt data with public key
   async encryptWithPublicKey(data, publicKey) {
     const encodedData = this.stringToArrayBuffer(JSON.stringify(data));
     const encrypted = await window.crypto.subtle.encrypt(
@@ -106,7 +97,6 @@ class CryptoManager {
     return this.arrayBufferToBase64(encrypted);
   }
 
-  // Decrypt data with private key
   async decryptWithPrivateKey(encryptedData, privateKey) {
     const encryptedBuffer = this.base64ToArrayBuffer(encryptedData);
     const decrypted = await window.crypto.subtle.decrypt(
@@ -118,7 +108,6 @@ class CryptoManager {
     return JSON.parse(decodedString);
   }
 
-  // Derive key from password for encrypting private key
   async deriveKeyFromPassword(password) {
     const encoder = new TextEncoder();
     const data = encoder.encode(password);
@@ -132,19 +121,15 @@ class CryptoManager {
     );
   }
 
-  // Encrypt private key with password
+
   async encryptPrivateKeyWithPassword(privateKey, password) {
-    // Export private key
     const exportedKey = await this.exportPrivateKey(privateKey);
     const keyData = this.base64ToArrayBuffer(exportedKey);
     
-    // Derive encryption key from password
     const encryptionKey = await this.deriveKeyFromPassword(password);
     
-    // Generate IV
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     
-    // Encrypt
     const encrypted = await window.crypto.subtle.encrypt(
       { name: "AES-GCM", iv: iv },
       encryptionKey,
@@ -157,23 +142,20 @@ class CryptoManager {
     };
   }
 
-  // Decrypt private key with password
   async decryptPrivateKeyWithPassword(encryptedPrivateKeyData, iv, password) {
-    // Derive decryption key from password
+
     const decryptionKey = await this.deriveKeyFromPassword(password);
     
-    // Convert data
+    
     const encryptedData = this.base64ToArrayBuffer(encryptedPrivateKeyData);
     const ivData = this.base64ToArrayBuffer(iv);
     
-    // Decrypt
     const decrypted = await window.crypto.subtle.decrypt(
       { name: "AES-GCM", iv: ivData },
       decryptionKey,
       encryptedData
     );
     
-    // Import the decrypted private key
     return await window.crypto.subtle.importKey(
       "pkcs8",
       decrypted,
@@ -186,7 +168,6 @@ class CryptoManager {
     );
   }
 
-  // Get user's keys from Firestore
   async getUserKeys(userId) {
     try {
       const userDoc = await firestore.collection('users').doc(userId).get();
@@ -199,7 +180,6 @@ class CryptoManager {
     }
   }
 
-  // Store encrypted user data
   async storeEncryptedUserData(userId, encryptedData) {
     try {
       await firestore.collection('users').doc(userId).update({
@@ -211,7 +191,6 @@ class CryptoManager {
     }
   }
 
-  // Get encrypted user data
   async getEncryptedUserData(userId) {
     try {
       const userDoc = await firestore.collection('users').doc(userId).get();
@@ -225,7 +204,6 @@ class CryptoManager {
   }
 }
 
-// Create singleton instance
 const cryptoManager = new CryptoManager();
 
 export default cryptoManager;

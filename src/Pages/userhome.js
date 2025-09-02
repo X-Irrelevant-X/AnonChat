@@ -360,11 +360,11 @@ function UserHome() {
           <h3
             style={{
               textAlign: 'center',
-              border: '2px solid #ccc',   // border thickness and color
-              borderRadius: '8px',        // rounded corners (optional)
-              padding: '10px 20px',       // space inside the block
-              margin: '20px 0',           // space outside the block
-              backgroundColor: '#434374ff'  // optional light background
+              border: '2px solid #ccc',
+              borderRadius: '8px',   
+              padding: '10px 20px',   
+              margin: '20px 0',      
+              backgroundColor: '#434374ff' 
             }}
           >
             My Chats

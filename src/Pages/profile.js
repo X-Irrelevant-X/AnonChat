@@ -6,6 +6,7 @@ import sessionManager from '../security/sessionManager';
 import EncryptionService from '../security/encrydecry';
 import '../Styles/profile_s.css';
 
+
 const Profile = () => {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
@@ -23,7 +24,6 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load and decrypt user data
   useEffect(() => {
     if (!user) return;
 
@@ -31,23 +31,19 @@ const Profile = () => {
       try {
         setLoading(true);
         
-        // Check if session is active
         if (!sessionManager.isSessionActive()) {
           auth.signOut();
           navigate('/signin');
           return;
         }
         
-        // Get private key from session
         const privateKey = sessionManager.getPrivateKey();
         
-        // Get user document from Firestore
         const userDoc = await firestore.collection('users').doc(user.uid).get();
         
         if (userDoc.exists) {
           const encryptedData = userDoc.data();
           
-          // Decrypt profile data
           let decryptedProfile = {};
           if (encryptedData.encryptedProfile) {
             decryptedProfile = await EncryptionService.decryptUserProfileData(
@@ -56,7 +52,6 @@ const Profile = () => {
             );
           }
           
-          // Combine decrypted data with non-sensitive data
           const fullUserData = {
             ...encryptedData,
             ...decryptedProfile
@@ -146,13 +141,10 @@ const Profile = () => {
     setError(null);
 
     try {
-      // Re-authenticate using your session manager
       await sessionManager.reauthenticate(user.uid, deletePassword);
 
-      // Delete user data from Firestore
       await firestore.collection('users').doc(user.uid).delete();
       
-      // Delete user account from Firebase Auth
       await user.delete();
       
       // End session
@@ -179,7 +171,7 @@ const Profile = () => {
   };
 
   const handleSignOut = () => {
-    sessionManager.endSession(); // End session using your session manager
+    sessionManager.endSession();
     auth.signOut();
     navigate('/');
   };

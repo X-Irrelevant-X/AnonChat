@@ -5,6 +5,7 @@ import EncryptionService from '../security/encrydecry';
 import keyManager from '../security/keymanage'; 
 import '../Styles/Register_s.css';
 
+
 const Register = () => {
   const [formData, setFormData] = useState({
     email: '',
@@ -27,7 +28,6 @@ const Register = () => {
     });
   };
 
-  // Enhanced password validation
   const validatePassword = (password) => {
     const validations = {
       length: password.length >= 8,
@@ -56,14 +56,12 @@ const Register = () => {
     setLoading(true);
     setError(null);
 
-    // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
       return;
     }
 
-    // Enhanced password validation
     const passwordValidations = validatePassword(formData.password);
     const isPasswordValid = Object.values(passwordValidations).every(Boolean);
     
@@ -74,13 +72,11 @@ const Register = () => {
     }
 
     try {
-      // Create user account with Firebase Authentication
       const userCredential = await auth.createUserWithEmailAndPassword(
         formData.email,
         formData.password
       );
 
-      // Create initial user document in Firestore
       await firestore.collection('users').doc(userCredential.user.uid).set({
         uid: userCredential.user.uid,
         email: formData.email,
@@ -88,13 +84,11 @@ const Register = () => {
         lastSeen: new Date()
       });
 
-      // Initialize user's encryption keys
       const userKeys = await keyManager.initializeUserKeys(
         userCredential.user.uid, 
         formData.password
       );
 
-      // Prepare user profile data for encryption
       const userProfile = {
         username: formData.username || formData.email.split('@')[0],
         firstName: formData.firstName || '',
@@ -104,15 +98,14 @@ const Register = () => {
         email: formData.email
       };
 
-      // Encrypt user profile data with user's own public key
       const encryptedProfile = await EncryptionService.encryptUserProfileData(
         userProfile,
-        userKeys.publicKey // Encrypt with user's own public key
+        userKeys.publicKey
       );
 
       // Update user document with encrypted profile
       await firestore.collection('users').doc(userCredential.user.uid).update({
-        encryptedProfile: encryptedProfile // Store encrypted profile
+        encryptedProfile: encryptedProfile
       });
 
       alert("Account created successfully!");

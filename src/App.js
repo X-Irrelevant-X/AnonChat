@@ -32,7 +32,6 @@ function App() {
   );
 }
 
-// Wrapper components
 const SignupPage = () => (
   <div className="form-container">
     <Register />

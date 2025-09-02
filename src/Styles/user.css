@@ -540,3 +540,15 @@
   margin-left: 8px;
   margin-right: 8px;
 }
+
+.sidebar h3 {
+  text-align: center;
+}
+
+.chat-header {
+  text-align: center;
+}
+
+.chat-view .chat-header {
+  text-align: center;
+}

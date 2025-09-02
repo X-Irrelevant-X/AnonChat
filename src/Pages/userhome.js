@@ -357,13 +357,24 @@ function UserHome() {
       <div className="user-content">
         {/* Sidebar */}
         <aside className="sidebar">
-          <h3>My Chats</h3>
+          <h3
+            style={{
+              textAlign: 'center',
+              border: '2px solid #ccc',   // border thickness and color
+              borderRadius: '8px',        // rounded corners (optional)
+              padding: '10px 20px',       // space inside the block
+              margin: '20px 0',           // space outside the block
+              backgroundColor: '#434374ff'  // optional light background
+            }}
+          >
+            My Chats
+          </h3>
+
           <ul className="chats-list">
             {chats.map(chat => (
               <li key={chat.id} className="chat-item" onClick={() => handleChatClick(chat)}>
-                <div className="chat-header">
+                <div className="chat-header" style={{ display: 'flex', justifyContent: 'center' }}>
                   <h4>{getChatName(chat, user.uid)}</h4>
-                  <p>{chat.lastMessage?.text || 'No messages'}</p>
                 </div>
                 <div className="chat-meta">
                   <span>{chat.lastMessage?.createdAt ? new Date(chat.lastMessage.createdAt.toDate ? chat.lastMessage.createdAt.toDate() : chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
@@ -634,18 +645,24 @@ function ChatView({ chat, currentUser, getChatName }) {
 
   return (
     <div className="chat-view">
-      <div className="chat-header">
-        <h2>{getChatName(chat, currentUser.uid)}</h2>
-        <p className="encryption-status">🔒 End-to-end encrypted</p>
+      <div 
+        className="chat-header" 
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'relative' }}
+      >
+        <h2 style={{ margin: '0 auto', position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          {getChatName(chat, currentUser.uid)}
+        </h2>
+        <p className="encryption-status" style={{ marginLeft: 'auto' }}>
+          🔒 End-to-end encrypted
+        </p>
       </div>
+
 
       <div className="chat-messages">
         {messages.map(msg => {
-          // For encrypted messages, get the version encrypted for current user
           let displayText = msg.text || '[Message could not be decrypted]';
           
           if (msg.encryptedVersions && msg.encryptedVersions[currentUser.uid]) {
-            // Message will be decrypted in the useEffect above
             displayText = msg.text || '[Decrypting...]';
           }
 

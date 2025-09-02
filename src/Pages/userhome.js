@@ -6,7 +6,6 @@ import sessionManager from '../security/sessionManager';
 import EncryptionService from '../security/encrydecry';
 import '../Styles/user.css';
 
-
 function UserHome() {
   const [user] = useAuthState(auth);
   const navigate = useNavigate();
@@ -74,17 +73,57 @@ function UserHome() {
     loadAndDecryptUserProfile();
   }, [user, navigate]);
 
-  // Load user's chats from Firestore
+  // Load user's chats from Firestore and decrypt last messages
   useEffect(() => {
     if (!user) return;
 
     const chatsRef = firestore.collection('chats').where('users', 'array-contains', user.uid);
-    const unsubscribe = chatsRef.onSnapshot(snapshot => {
-      const chatList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setChats(chatList);
+    const unsubscribe = chatsRef.onSnapshot(async (snapshot) => {
+      try {
+        const privateKey = sessionManager.getPrivateKey();
+        const chatList = [];
+        
+        for (const doc of snapshot.docs) {
+          const chatData = doc.data();
+          let lastMessageText = 'No messages';
+          
+          // Decrypt last message if it exists and is encrypted
+          if (chatData.lastMessage && chatData.lastMessage.encryptedMessage) {
+            try {
+              const decryptedLastMessage = await EncryptionService.decryptChatMessage(
+                chatData.lastMessage.encryptedMessage,
+                privateKey
+              );
+              lastMessageText = decryptedLastMessage.text || decryptedLastMessage;
+            } catch (decryptError) {
+              console.error('Failed to decrypt last message:', decryptError);
+              lastMessageText = '[Encrypted message]';
+            }
+          } else if (chatData.lastMessage && chatData.lastMessage.text) {
+            // Fallback for unencrypted messages
+            lastMessageText = chatData.lastMessage.text;
+          }
+          
+          chatList.push({
+            id: doc.id,
+            ...chatData,
+            lastMessage: {
+              ...chatData.lastMessage,
+              text: lastMessageText
+            }
+          });
+        }
+        
+        setChats(chatList);
+      } catch (error) {
+        console.error('Error loading chats:', error);
+        // Fallback to showing chats without decrypted last messages
+        const chatList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setChats(chatList);
+      }
     });
 
     return () => unsubscribe();
@@ -372,7 +411,7 @@ function UserHome() {
               </div>
             </div>
           ) : selectedChat ? (
-            <ChatView chat={selectedChat} />
+            <ChatView chat={selectedChat} currentUser={user} />
           ) : (
             <div className="empty-state">
               <h2>Select a chat to start messaging</h2>
@@ -385,58 +424,234 @@ function UserHome() {
   );
 }
 
-function ChatView({ chat }) {
+function ChatView({ chat, currentUser }) {
   const [messages, setMessages] = useState([]);
   const [formValue, setFormValue] = useState('');
+  const [chatParticipants, setChatParticipants] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Load messages for selected chat
+  // Load chat participants and their public keys
   useEffect(() => {
+    const loadChatParticipants = async () => {
+      try {
+        const participants = [];
+        
+        for (const userId of chat.users) {
+          if (userId === currentUser.uid) {
+            // For current user, get public key from session
+            const publicKey = sessionManager.getPublicKey();
+            participants.push({
+              uid: userId,
+              publicKey: publicKey,
+              isCurrentUser: true
+            });
+          } else {
+            // For other users, get public key from friends collection or user document
+            const friendQuery = await firestore
+              .collection('friends')
+              .where('user1', '==', currentUser.uid)
+              .where('user2', '==', userId)
+              .where('status', '==', 'accepted')
+              .get();
+              
+            const friendQuery2 = await firestore
+              .collection('friends')
+              .where('user1', '==', userId)
+              .where('user2', '==', currentUser.uid)
+              .where('status', '==', 'accepted')
+              .get();
+            
+            let publicKeyString = null;
+            
+            if (!friendQuery.empty) {
+              // Friend request was sent by current user
+              publicKeyString = friendQuery.docs[0].data().user2PublicKey;
+            } else if (!friendQuery2.empty) {
+              // Friend request was sent by other user
+              publicKeyString = friendQuery2.docs[0].data().user1PublicKey;
+            }
+            
+            if (publicKeyString) {
+              const publicKey = await importPublicKeyFromString(publicKeyString);
+              participants.push({
+                uid: userId,
+                publicKey: publicKey,
+                isCurrentUser: false
+              });
+            }
+          }
+        }
+        
+        setChatParticipants(participants);
+      } catch (error) {
+        console.error('Error loading chat participants:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadChatParticipants();
+  }, [chat, currentUser]);
+
+  // Load and decrypt messages for selected chat
+  useEffect(() => {
+    if (chatParticipants.length === 0) return;
+
     const messagesRef = firestore.collection(`chats/${chat.id}/messages`);
-    const unsubscribe = messagesRef.orderBy('createdAt').onSnapshot(snapshot => {
-      const msgList = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMessages(msgList);
+    const unsubscribe = messagesRef.orderBy('createdAt').onSnapshot(async (snapshot) => {
+      try {
+        const privateKey = sessionManager.getPrivateKey();
+        const msgList = [];
+        
+        for (const doc of snapshot.docs) {
+          const messageData = doc.data();
+          
+          let decryptedText = messageData.text;
+          
+          // If message is encrypted, decrypt it
+          if (messageData.encryptedVersions && messageData.encryptedVersions[currentUser.uid]) {
+            try {
+              decryptedText = await EncryptionService.decryptChatMessage(
+                messageData.encryptedVersions[currentUser.uid],
+                privateKey
+              );
+              // Extract the text from the decrypted data
+              decryptedText = decryptedText.text || decryptedText;
+            } catch (decryptError) {
+              console.error('Failed to decrypt message:', decryptError);
+              decryptedText = '[Message could not be decrypted]';
+            }
+          }
+          
+          msgList.push({
+            id: doc.id,
+            ...messageData,
+            text: decryptedText
+          });
+        }
+        
+        setMessages(msgList);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      }
     });
 
     return () => unsubscribe();
-  }, [chat]);
+  }, [chat, chatParticipants, currentUser.uid]);
+
+  // Helper function to import public key from string
+  const importPublicKeyFromString = async (keyString) => {
+    const binaryString = atob(keyString);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    return await window.crypto.subtle.importKey(
+      "spki",
+      bytes.buffer,
+      {
+        name: "RSA-OAEP",
+        hash: "SHA-256"
+      },
+      false,
+      ["encrypt"]
+    );
+  };
 
   const sendMessage = async (e) => {
     e.preventDefault();
+    if (!formValue.trim()) return;
 
-    await firestore.collection(`chats/${chat.id}/messages`).add({
-      text: formValue,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      uid: auth.currentUser.uid,
-      photoURL: auth.currentUser.photoURL
-    });
+    try {
+      // Create encrypted versions for each participant
+      const encryptedVersions = {};
+      
+      for (const participant of chatParticipants) {
+        if (participant.publicKey) {
+          const encryptedMessage = await EncryptionService.encryptChatMessage(
+            formValue,
+            participant.publicKey
+          );
+          encryptedVersions[participant.uid] = encryptedMessage;
+        }
+      }
 
-    setFormValue('');
+      // Store message with encrypted versions for each user
+      await firestore.collection(`chats/${chat.id}/messages`).add({
+        encryptedVersions: encryptedVersions, // Encrypted for each participant
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        uid: auth.currentUser.uid,
+        photoURL: auth.currentUser.photoURL,
+        // Remove plain text storage
+        // text: formValue, // DON'T STORE PLAIN TEXT
+      });
+
+      // Update chat's last message (store encrypted version for current user)
+      const currentUserEncrypted = encryptedVersions[currentUser.uid];
+      await firestore.collection('chats').doc(chat.id).update({
+        lastMessage: {
+          encryptedMessage: currentUserEncrypted,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          uid: auth.currentUser.uid
+        }
+      });
+
+      setFormValue('');
+    } catch (error) {
+      console.error('Error sending encrypted message:', error);
+      alert('Failed to send message: ' + error.message);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="chat-view">
+        <div className="loading-message">
+          <p>Loading chat...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chat-view">
-      <div className="chat-header" textAlign="center">
+      <div className="chat-header">
         <h2>{chat.name || 'Chat'}</h2>
+        <p className="encryption-status">🔒 End-to-end encrypted</p>
       </div>
 
       <div className="chat-messages">
-        {messages.map(msg => (
-          <div key={msg.id} className={`message ${msg.uid === auth.currentUser.uid ? 'sent' : 'received'}`}>
-            <p>{msg.text}</p>
-          </div>
-        ))}
+        {messages.map(msg => {
+          // For encrypted messages, get the version encrypted for current user
+          let displayText = msg.text || '[Message could not be decrypted]';
+          
+          if (msg.encryptedVersions && msg.encryptedVersions[currentUser.uid]) {
+            // Message will be decrypted in the useEffect above
+            displayText = msg.text || '[Decrypting...]';
+          }
+
+          return (
+            <div key={msg.id} className={`message ${msg.uid === auth.currentUser.uid ? 'sent' : 'received'}`}>
+              <p>{displayText}</p>
+              <span className="message-time">
+                {msg.createdAt && new Date(msg.createdAt.toDate ? msg.createdAt.toDate() : msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       <form onSubmit={sendMessage} className="chat-form">
         <input
           value={formValue}
           onChange={(e) => setFormValue(e.target.value)}
-          placeholder="Enter a message"
+          placeholder="Enter a message (encrypted)"
+          disabled={chatParticipants.length === 0}
         />
-        <button type="submit" disabled={!formValue}>🕊️</button>
+        <button type="submit" disabled={!formValue.trim() || chatParticipants.length === 0}>
+          🔒 Send
+        </button>
       </form>
     </div>
   );

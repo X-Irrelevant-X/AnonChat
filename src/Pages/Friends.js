@@ -104,7 +104,6 @@ const Friends = () => {
       });
 
       if (existingChat) {
-        // Chat exists, navigate to it
         navigate('/userhome', { state: { selectedChat: existingChat } });
       } else {
         // Get friendship document to get public keys
@@ -135,8 +134,6 @@ const Friends = () => {
       setProfileLoading(true);
       setViewingProfile(friend);
       
-      // The profile data is already available in the friend object
-      // from the friendship record (shared at time of friendship establishment)
       setProfileData({
         username: friend.username,
         email: friend.email,

@@ -164,7 +164,6 @@ function UserHome() {
     }
   };
 
-  // src/Pages/UserHome.js (updated handleAddFriend function)
   const handleAddFriend = async (friendId) => {
     try {
       // Check if friend request already exists

@@ -1,5 +1,4 @@
 import cryptoManager from './crypto';
-import keyManager from './keymanage';
 
 class EncryptionService {
   constructor() {
@@ -89,6 +88,41 @@ class EncryptionService {
     } catch (error) {
       throw new Error('Failed to decrypt data: ' + error.message);
     }
+  }
+
+  async encryptWithAES(data, recipientPublicKey) {
+    // 1. Generate AES key + IV
+    const aesKey = crypto.randomBytes(32); // AES-256
+    const iv = crypto.randomBytes(16);
+
+    // 2. Encrypt the data with AES
+    const cipher = crypto.createCipheriv('aes-256-cbc', aesKey, iv);
+    let encryptedData = cipher.update(JSON.stringify(data), 'utf8', 'base64');
+    encryptedData += cipher.final('base64');
+
+    // 3. Encrypt AES key with RSA
+    const encryptedKey = await this.crypto.encryptWithPublicKey(aesKey.toString('base64'), recipientPublicKey);
+
+    return {
+      encryptedKey, // RSA-protected AES key
+      iv: iv.toString('base64'),
+      data: encryptedData,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async decryptWithAES(encryptedPacket, userPrivateKey) {
+    // 1. Decrypt AES key with RSA
+    const aesKeyBase64 = await this.crypto.decryptWithPrivateKey(encryptedPacket.encryptedKey, userPrivateKey);
+    const aesKey = Buffer.from(aesKeyBase64, 'base64');
+
+    // 2. Decrypt data with AES
+    const iv = Buffer.from(encryptedPacket.iv, 'base64');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
+    let decrypted = decipher.update(encryptedPacket.data, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+
+    return JSON.parse(decrypted);
   }
 }
 

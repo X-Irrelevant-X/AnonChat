@@ -106,19 +106,37 @@ const Friends = () => {
       if (existingChat) {
         navigate('/userhome', { state: { selectedChat: existingChat } });
       } else {
-        // Get friendship document to get public keys
+        // Get friendship document to get public keys and user info
         const friendshipDoc = await firestore.collection('friends').doc(friend.friendshipId).get();
         const friendshipData = friendshipDoc.data();
         
-        // Create new encrypted chat
-        const newChat = await firestore.collection('chats').add({
+        // Store user info for dynamic naming (but don't set a static name)
+        const chatData = {
           users: [user.uid, friend.friendId],
           user1PublicKey: friendshipData.user1PublicKey,
           user2PublicKey: friendshipData.user2PublicKey,
-          name: `${friend.username || friend.email}`,
+          // Store user information for dynamic naming
+          userInfo: {
+            [user.uid]: {
+              username: friendshipData.user1 === user.uid ? friendshipData.user1Username : friendshipData.user2Username,
+              email: friendshipData.user1 === user.uid ? friendshipData.user1Email : friendshipData.user2Email,
+              firstName: friendshipData.user1 === user.uid ? friendshipData.user1FirstName : friendshipData.user2FirstName,
+              lastName: friendshipData.user1 === user.uid ? friendshipData.user1LastName : friendshipData.user2LastName
+            },
+            [friend.friendId]: {
+              username: friend.username,
+              email: friend.email,
+              firstName: friend.firstName,
+              lastName: friend.lastName
+            }
+          },
           createdAt: new Date(),
           createdBy: user.uid
-        });
+          // Remove static name field - will be generated dynamically
+        };
+        
+        // Create new encrypted chat
+        const newChat = await firestore.collection('chats').add(chatData);
         
         const chatDoc = await firestore.collection('chats').doc(newChat.id).get();
         navigate('/userhome', { state: { selectedChat: { id: newChat.id, ...chatDoc.data() } } });

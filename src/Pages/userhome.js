@@ -150,6 +150,24 @@ function UserHome() {
     setShowAddFriend(false); // Hide add friend panel when selecting chat
   };
 
+  // Helper function to get dynamic chat name
+  const getChatName = (chat, currentUserId) => {
+    if (!chat.userInfo || !chat.users) return 'Unknown Chat';
+    
+    // For 2-person chats, show the other person's name
+    if (chat.users.length === 2) {
+      const otherUserId = chat.users.find(uid => uid !== currentUserId);
+      if (otherUserId && chat.userInfo[otherUserId]) {
+        const otherUser = chat.userInfo[otherUserId];
+        return otherUser.username || otherUser.email?.split('@')[0] || 'Unknown User';
+      }
+    }
+    
+    // For group chats (future feature), you could show all names
+    // For now, fallback to static name if it exists
+    return chat.name || 'Unknown Chat';
+  };
+
   // Search for users by username or email
   const handleSearchUsers = async () => {
     if (!searchTerm.trim()) return;
@@ -344,7 +362,7 @@ function UserHome() {
             {chats.map(chat => (
               <li key={chat.id} className="chat-item" onClick={() => handleChatClick(chat)}>
                 <div className="chat-header">
-                  <h4>{chat.name || 'Unnamed Chat'}</h4>
+                  <h4>{getChatName(chat, user.uid)}</h4>
                   <p>{chat.lastMessage?.text || 'No messages'}</p>
                 </div>
                 <div className="chat-meta">
@@ -411,7 +429,7 @@ function UserHome() {
               </div>
             </div>
           ) : selectedChat ? (
-            <ChatView chat={selectedChat} currentUser={user} />
+            <ChatView chat={selectedChat} currentUser={user} getChatName={getChatName} />
           ) : (
             <div className="empty-state">
               <h2>Select a chat to start messaging</h2>
@@ -424,7 +442,7 @@ function UserHome() {
   );
 }
 
-function ChatView({ chat, currentUser }) {
+function ChatView({ chat, currentUser, getChatName }) {
   const [messages, setMessages] = useState([]);
   const [formValue, setFormValue] = useState('');
   const [chatParticipants, setChatParticipants] = useState([]);
@@ -617,7 +635,7 @@ function ChatView({ chat, currentUser }) {
   return (
     <div className="chat-view">
       <div className="chat-header">
-        <h2>{chat.name || 'Chat'}</h2>
+        <h2>{getChatName(chat, currentUser.uid)}</h2>
         <p className="encryption-status">🔒 End-to-end encrypted</p>
       </div>
 
